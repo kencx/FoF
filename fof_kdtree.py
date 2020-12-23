@@ -44,15 +44,12 @@ luminous_galaxy_data = galaxy_arr[galaxy_arr[:,3] <= -20.5] # filter for galaxie
 
 def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_radius):
     '''
-    galaxy_data (arr): Galaxy data
+    galaxy_data (arr): Galaxy data ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
+    center_data (arr): Cluster center candidate data ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
     max_velocity (float): Maximum velocity with respect to cluster centre in km/s
     linking_length_factor (float): Factor for transverse linking length cutoff
     virial_radius (float): Maximum radius of cluster in Mpc
     '''
-
-    candidates = {}
-    # galaxy_data[:,-1] = redshift_to_velocity(galaxy_data[:,2]).to('km/s').value
-    # luminous_galaxy_data = galaxy_data[galaxy_data[:,3] <= -20.5] # filter for galaxies brighter than -20.5
 
     '''
     Search for cluster candidates
@@ -62,6 +59,8 @@ def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_ra
     3. Select for galaxies joined by 2x the linking length using kdtree to obtain FoF galaxies
     4. Initialize dict storing candidates: {centre: [arr of FoF points]}
     '''
+
+    candidates = {}
 
     for i, coord in enumerate(center_data):
 
@@ -146,10 +145,7 @@ def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_ra
 
 
     cluster_centers = np.array([k for k in candidates.keys()]) # array of cluster centers
-    
-    # velocity_cutoff = galaxy_data[(galaxy_data[:,-1] >= coord_velocity - max_velocity) & (galaxy_data[:,-1] <= coord_velocity + max_velocity)] # select for galaxies within max_velocity of cluster centre
 
-    # center_tree = cKDTree(cluster_centers[:,:2])
     merged_candidates = candidates.copy()
 
     for center, member_arr in candidates.items():
