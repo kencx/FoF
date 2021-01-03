@@ -68,6 +68,8 @@ def add_to_db(df, table_name):
     c = conn.cursor()
     df.to_sql(table_name, conn, if_exists='replace', index=False)
     print('Table added to SQL DB.')
+    conn.commit()
+    conn.close()
 
 def add_data(df, name):
     df_to_csv(df, name)

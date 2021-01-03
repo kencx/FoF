@@ -3,10 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree, distance
 from astropy import units as u
-# from astropy.constants import G
+from astropy.constants import G
 from astropy.cosmology import WMAP5 as cosmo
 from virial_mass_estimator import virial_mass_estimator as vm_estimator
-from virial_mass_estimator import redshift_to_velocity
+from virial_mass_estimator import redshift_to_velocity, split_df_into_groups
+import time
 
 '''
 Todo:
@@ -96,8 +97,8 @@ def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_ra
             if not i % 100:
                 print('Candidate ' + str(i) + ' identified with ' + str(len(f_points)) + ' members')
 
-        if len(candidates) >= 100:
-            break
+        # if len(candidates) >= 100:
+        #     break
         
 
     # if check_map:    
@@ -324,72 +325,173 @@ def interloper_removal(cluster_center, cluster_members):
         - calculate virial radius
         - calculate max velocity
     - repeat until converge
+    TODO: find max_velocity of galaxies in LOS of cluster center
     '''
 
-    def max_velocity(M, r): # max velocity in km/s
-        v_cir = np.sqrt(G*M/r)
-        v_inf = 2**(1/2)*v_cir
-        return max(v_cir, v_inf)
+    def v_cir(M, r):
+        return (np.sqrt(G*M/(r*u.Mpc))).to(u.km/u.s)
+
+    def v_inf(v_cir):
+        return v_cir*2**(1/2)
+
+    def max_velocity(cluster_center, cluster_members, virial_radius, tree, n):
+        
+        r_ij = np.zeros((n,n))
+        R = np.linspace(0, virial_radius, n) # bin projected plane into n steps
+
+        r_ij[:,0] = R # initialize projected distance into first column
+        for j in range(len(R)):
+            # col0: projected 2D plane distances
+            # from col1: sqrt(binned projected distance^2 + binned LOS distance^2)
+            r_ij[:,j] = np.sqrt(R**2 + R[j]**2) # bin LOS plane into n steps and initialize actual distance
+        r_ij[r_ij > virial_radius] = virial_radius # replace all values > virial_radius with virial_radius
+        
+        theta = np.zeros(r_ij.shape)
+        v_max = np.zeros(r_ij.shape)
+        c_mem = {}
+
+        cluster_redshift = np.median(cluster_members[:,2])
+        A = linear_to_angular_dist(R, cluster_center[2]).value # angular distance
+
+        for i in range(len(R)):
+            theta[:,i] = np.arcsin(r_ij[:,0]/r_ij[:,i]) # divide all cols by first col, then take arcsin 
+        theta[1:,0] = 0.0
+
+        for i in range(len(R)): # bottleneck
+
+            concentric_idx = tree.query_ball_point(cluster_center[:2], r=A[i]) # search for members within each bin
+            concentric_members = cluster_members[concentric_idx]
+            c_mem[i] = concentric_members # dict of members in each concentric bin, key is the index for each bin
+            
+        M = np.zeros(R.shape)
+        for k in c_mem.keys(): # evaluate mass of galaxies in concentric bins
+            if len(c_mem[k]) > 1:
+                if (len(c_mem[k]) - len(c_mem[k-1])) != 0:
+                    M[k] = vm_estimator(c_mem[k], cluster_redshift)[0].value
+                else:
+                    M[k] = M[k-1] # if num of galaxies does not change, mass remains the same
+
+        for i in range(len(R)):
+            v_c = v_cir(M[i]*u.M_sun, r_ij[i,:])
+            v_max[i,:] = np.maximum(v_c*np.cos(theta[i,:]), v_inf(v_c)*np.sin(theta[i,:]))
+        
+        v_max = np.amax(v_max, axis=1) # maximum velocity for each row (projected radius step)
+        v_max[0] = 0
+
+        # configure dict to have only set members in each concentric bin, ie. the members in a specific bin should contain galaxies from the first to the current bin
+        c_mem2 = c_mem.copy()
+        for k in c_mem.keys():
+            if k >= 1:
+                a1 = c_mem[k]
+                a2 = c_mem[k-1]
+                a1_rows = a1.view([('', a1.dtype)]*a1.shape[1])
+                a2_rows = a2.view([('', a2.dtype)]*a2.shape[1])
+                c_mem2[k] = np.setdiff1d(a1_rows, a2_rows).view(a1.dtype).reshape(-1,a1.shape[1])
+
+        # remove those with v > v_max
+        for k in c_mem2.keys():
+            mem = c_mem2[k]
+            mem = mem[abs(mem[:,-1] - cluster_center[-2]) <= v_max[k]] 
+            c_mem2[k] = mem
+
+        final_members = np.concatenate([v for v in c_mem2.values()]).ravel().reshape(-1,cluster_members.shape[1]) # unravel dict into arr of members
+
+        return final_members
 
     def virial_radius_estimator(virial_mass, photo_z):
         critical_density = cosmo.critical_density(z=photo_z)
         r_200 = virial_mass/(200*np.pi*4/3*critical_density)
-        return r_200**(1/3).to('Mpc')
+        return (r_200**(1/3)).to(u.Mpc)
 
 
-    virial_mass, velocity_dispersion, projected_radius = vm_estimator(cluster_members, savetxt=False)
     cleaned_members = np.copy(cluster_members)
-
     size_before = len(cleaned_members)
     size_after = 0
     size_change = size_after - size_before
 
-    while size_change != 0: # repeat until convergence
+    while (size_change != 0) and (len(cleaned_members) > 0): # repeat until convergence
+
         size_before = len(cleaned_members)
-
-        for idx, member in enumerate(cluster_members):
-            if (abs(member[5] - cluster_center[5]) >=  max_velocity): # identify interlopers further than max velocity
-                np.delete(cleaned_members, (idx), axis=0) # remove interloper
-
-        virial_radius = virial_radius_estimator(virial_mass, cluster_center[:,2])
-        tree = cKDTree(cleaned_members[:,:2])
-        idx = tree.query_ball_point(cluster_center[:2], r=virial_radius.value)
-        cleaned_members = cleaned_members[idx]
+        virial_mass, _, _ = vm_estimator(cluster_members, np.median(cluster_members[:,2]))
         
+        virial_radius = virial_radius_estimator(virial_mass, cluster_center[2]).value
+        tree = cKDTree(cleaned_members[:,:2])
+        idx = tree.query_ball_point(cluster_center[:2], virial_radius)
+        cleaned_members = cleaned_members[idx]
+        if len(cleaned_members) < 20:
+            cleaned_members = np.array([])
+            break
+        
+        cleaned_members = max_velocity(cluster_center, cleaned_members, virial_radius, tree, n=50)
+
         size_after = len(cleaned_members)
         size_change = size_after - size_before
 
-    return cluster_center, cleaned_members
+    if len(cleaned_members) < 20:
+        cleaned_members = np.array([])
+
+    return cleaned_members
 
     
-
 def cluster_search(galaxy_data, center_data, max_velocity, linking_length_factor, virial_radius, check_map=True, export=False, fname=''):
     candidates = FoF(galaxy_data, center_data, max_velocity=max_velocity, linking_length_factor=linking_length_factor, virial_radius=virial_radius, check_map=check_map)
-    print((str(len(candidates)) + ' candidate clusters found.'))
-    # final_candidates = interloper_removal()
-
-    # print(str(len(final_candidates)-len(candidates)) + ' interlopers removed.')
-
-    bcg_df, member_df = create_df(candidates)
+    candidate_df, candidate_member_df = create_df(candidates)
     if export:
-        bcg_df.to_csv(fname + '_bcg.csv', index=False)
-        member_df.to_csv(fname + '_members.csv', index=False)
+        candidate_df.to_csv(fname + '_candidate_bcg.csv', index=False)
+        candidate_member_df.to_csv(fname + '_candidate_members.csv', index=False)
+    
+    print((str(len(candidates)) + ' candidate clusters found.'))
+
+    final_candidates = candidates.copy()
+    for center, members in candidates.items():
+        final_candidates[center] = interloper_removal(center, members)
+        print(str(len(members)-len(final_candidates[center])) + ' interlopers removed.')
+
+    final_candidates = {k: v for k,v in final_candidates.items() if len(v)}
+
+    bcg_df, member_df = create_df(final_candidates)
+    if export:
+        bcg_df.to_csv(fname + '_final_bcg.csv', index=False)
+        member_df.to_csv(fname + '_final_members.csv', index=False)
 
     print('Cluster search returned ' + str(len(bcg_df)) + ' clusters')
     return bcg_df, member_df
 
 
-# bcg_df, member_galaxy_df = cluster_search(galaxy_arr, luminous_galaxy_data, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, export=True, fname='test')
+if __name__ == "__main__":
+
+    # -- testing cluster_search function
+    bcg_df, member_galaxy_df = cluster_search(galaxy_arr, luminous_galaxy_data, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, check_map=True, export=True, fname='test')
+    
+
+    # -- testing speed of virial_mass_estimator
+    # bcg_df = pd.read_csv('test_bcg.csv')
+    # bcg_arr = bcg_df.values
+    # member_galaxy_df = pd.read_csv('test_members.csv')
+    # arr, group_n = split_df_into_groups(member_galaxy_df,'cluster_id')
+
+    # test_id = group_n[4]
+    # test_group = arr[arr[:,-1]==test_id]
+    # test_center = bcg_arr[bcg_arr[:,-2]==test_id][0]
+
+    # start = time.time()
+    # interloper_removal(test_center, test_group)
+    # end= time.time()
+    # print(str(end-start) + 's for ' + str(len(test_group)) + ' galaxies')
 
 
-# --- testing interloper removal
-# cleaned_candidates = {}
-# for k,v in candidate_list.items():
-#     cleaned_k, cleaned_v = interloper_removal(k,v)
-#     cleaned_candidates[cleaned_k] = cleaned_v
+    # masses = np.zeros(group_n.shape)
 
-# virial_masses = {}
-# for center,candidate in candidate_list.items():
-#     mass, vel_disp, radius = vm_estimator(candidate)
-#     virial_masses[center] = mass
-# print(virial_masses)
+    # for g in group_n[:100]:
+    #     cluster = arr[arr[:,-1]==g]
+    #     bcg = bcg_arr[int(g),:]
+    #     mass, vel_disp, rad = vm_estimator(cluster[:,:3], bcg[-1])
+    #     masses[int(g)] = mass.value
+
+    # np.savetxt(fname='cluster_masses.txt', X=masses)
+
+    # -- distribution of estimated cluster virial masses
+    # masses = np.loadtxt(fname='cluster_masses.txt')
+    # masses = masses[masses > 0]
+    # plt.hist(masses, bins='auto')
+    # plt.show()

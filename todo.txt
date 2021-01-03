@@ -1,0 +1,13 @@
+1. complete interloper_removal (DONE)
+2. find new bcg_df (DONE)
+3. perform comparison with new bcg_df based on richness accuracy
+
+4. calculate virial masses of bcg_df (DONE)
+5. perform comparison of virial masses to existing catalogues (source which catalogues??)
+
+6. look at bookmarked catalog matching to improve accuracy of cluster_finder_checker? IMPORTANT
+7. can i speed up virial_mass_estimator even more?
+8. speed up interloper_removal
+
+9. figure out how to check max_velocity of galaxies on the same LOS as center
+10. remove galaxies at corner, edges and masked areas
