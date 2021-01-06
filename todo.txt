@@ -1,13 +1,25 @@
-1. complete interloper_removal (DONE)
-2. find new bcg_df (DONE)
-3. perform comparison with new bcg_df based on richness accuracy
 
-4. calculate virial masses of bcg_df (DONE)
-5. perform comparison of virial masses to existing catalogues (source which catalogues??)
+KEY TASKS
+1. Remove galaxies from edges, corners and masked areas
+2. Correct for Malmquist bias - 1. Cut data; 2. Fit Gaussian curve
+3. Apply selection criteria from Abell Catalogue
+4. Obtain cluster sample (before and after interloper removal)
+5. Obtain mass estimates (add mass, virial radius, velocity dispersion to database)
+6. Compare projected mass and virial mass estimates
+7. Apply catalogue matching and richness accuracy test to compare between cluster sample and catalogues
+8. Compare sample masses with catalogue masses (X-ray group catalogue)
 
-6. look at bookmarked catalog matching to improve accuracy of cluster_finder_checker? IMPORTANT
-7. can i speed up virial_mass_estimator even more?
-8. speed up interloper_removal
+SEMI IMPORTANT
+1. Obtain max_velocity of galaxies on the same LOS as center
+2. Apply mass weighting to virial_mass_estimator
 
-9. figure out how to check max_velocity of galaxies on the same LOS as center
-10. remove galaxies at corner, edges and masked areas
+SPEED TASKS
+1. Speed up virial_mass_estimator
+2. Speed up interloper_removal
+
+
+SELECTION CRITERIA FOR ABELL CATALOGUE
+A cluster of galaxies listed in the Abell Catalogue. 
+To appear in the catalogue, a cluster must satisfy selection criteria which include containing more than 50 galaxies and having a dense concentration (richness). 
+The clusters are classified as regular (R) or irregular (I) in appearance, ranked in increasing richness from 1 to 5, and increasing distance from 1 to 6. 
+The approximate frequency of Abell clusters is one per 2.4 × 105 cubic megaparsecs.

@@ -8,6 +8,19 @@ from astropy.table import Table
 # Import astropy fits datasets to pandas df
 
 def fits_to_df(fname):
+    ''' Imports table from fits files and converts them to Pandas dataframes.
+
+    Parameters
+    ----------
+    fname: str
+        FITS file name
+
+    Returns
+    -------
+    df: pd.Dataframe
+        Pandas Dataframe
+    '''
+
     d = fits.open('datasets\\' + fname)
     print(d.info())
     col_num = int(input('Choose the table to import: '))
@@ -18,10 +31,36 @@ def fits_to_df(fname):
     print(df.head())
     return df
 
+
+def split_df_into_groups(df, column):
+    ''' Splits df of group members into groups
+
+    Parameters
+    ----------
+    df: pd.Dataframe
+        df to be split, where cluster_id must be last column (-1)
+
+    column: str
+        Name of column to sort and group by
+
+    Returns
+    -------
+    arr: array-like
+        Array of df rows
+    
+    group_n: array-like
+        Array of group ids
+
+    '''
+    arr = df.sort_values(column).values
+    group_n = np.unique(arr[:,-1])
+    
+    return arr, group_n
+
+
 # cosmic_web_df = fits_to_df('J_ApJ_837_16_table1.dat.gz.fits')
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
 # xray_df = fits_to_df('')
-
 
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
@@ -64,6 +103,16 @@ def df_to_csv(df, fname):
 
 
 def add_to_db(df, table_name):
+    ''' Adds df to sqlite3 database. Table is created if it does not exists. If table exists, data is replaced.
+
+    Parameters
+    ----------
+    df: pd.Dataframe
+    
+    table_name: str
+        Table to be added to
+    
+    '''
     conn = sqlite3.connect('galaxy_clusters.db')
     c = conn.cursor()
     df.to_sql(table_name, conn, if_exists='replace', index=False)

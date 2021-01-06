@@ -1,65 +1,101 @@
+# import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
 from scipy.spatial import cKDTree, distance
+
 from astropy import units as u
 from astropy.constants import G
 from astropy.cosmology import WMAP5 as cosmo
-from virial_mass_estimator import virial_mass_estimator as vm_estimator
-from virial_mass_estimator import redshift_to_velocity, split_df_into_groups
-import time
 
-'''
-Todo:
-    find a way to deal with incomplete sample areas (corners, poor masked areas)
-    write interloper_removal function
-'''
+from virial_mass_estimator import virial_mass_estimator, redshift_to_velocity
+
 
 def linear_to_angular_dist(distance, photo_z):
+    '''
+    Converts proper distance (Mpc) to angular distance (deg)
+
+    Parameters
+    ----------
+    distance: float, array-like
+        Distance in Mpc
+
+    photo_z: float, array-like
+        Associated redshift
+
+    Returns
+    -------
+    d: float, array-like
+        Angular distance in deg
+    '''
+
     return ((distance*u.Mpc).to(u.kpc) * cosmo.arcsec_per_kpc_proper(photo_z)).to(u.deg)
 
+
 def mean_separation(n, radius):
+    '''
+    Average mean separation of n objects in an area of a given radius. Calculated by taking rho**(-1/3).
+
+    Parameters
+    ----------
+    n: int
+        Number of objects
+
+    radius: float
+        Radius of area
+
+    Returns
+    -------
+    mean_separation: float, array-like
+        Average mean separation in units of radius
+
+    '''
     volume = 4/3 * np.pi * radius**3
     density = n/volume
     return 1/(density**(1/3))
 
 
-# -- preparing COSMOS photometric data
-
-df = pd.read_csv('datasets/cosmos2015_filtered.csv')
-df = df.loc[:, ['ALPHA_J2000', 'DELTA_J2000', 'PHOTOZ', 'MR', 'NUMBER']]
-
-# select from 0.5 <= z <= 1.0 and L >= -40
-df = df.loc[(df['PHOTOZ'] <= 1.0) & (df['PHOTOZ'] >= 0.5)] # & (df['MR'] >= -40)
-galaxy_arr = np.asarray(df)
-
-galaxy_arr = galaxy_arr[galaxy_arr[:,2].argsort()] # sort by redshift
-galaxy_arr = np.hstack((galaxy_arr, np.zeros((galaxy_arr.shape[0], 1)))) # add column for galaxy velocity
-
-galaxy_arr[:,-1] = redshift_to_velocity(galaxy_arr[:,2]).to('km/s').value
-luminous_galaxy_data = galaxy_arr[galaxy_arr[:,3] <= -20.5] # filter for galaxies brighter than -20.5
-
-# fig = plt.figure(figsize=(10,8))
-# plt.hist2d(data['ALPHA_J2000'], data['DELTA_J2000'], bins=(100,80))
-# plt.show()
-
-
 def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_radius, check_map=True):
     '''
-    galaxy_data (arr): Galaxy data ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
-    center_data (arr): Cluster center candidate data ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
-    max_velocity (float): Maximum velocity with respect to cluster centre in km/s
-    linking_length_factor (float): Factor for transverse linking length cutoff (0 < f < 1)
-    virial_radius (float): Maximum radius of cluster in Mpc
-    '''
-
-    '''
-    Search for cluster candidates
+    Steps
+    -----
+    Search for cluster candidates with the Friends-of-Friends algorithm
 
     1. For each galaxy brighter than -20.5, select for galaxies within a maximum velocity
-    2. Select for galaxies within virial radius using kdtree
-    3. Select for galaxies joined by 2x the linking length using kdtree to obtain FoF galaxies
-    4. Initialize dict storing candidates: {centre: [arr of FoF points]}
+    2. Select for galaxies within virial radius using scipy.ckdtree
+    3. Select for galaxies joined by 2x the linking length using ckdtree to obtain FoF galaxies
+    4. Initialize dict storing candidates: {center: [arr of FoF points]}
+
+    Parameters
+    ----------
+    galaxy_data: array-like
+        Galaxy data with properties: ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
+    
+    center_data: array-like 
+        Cluster center candidate data with properties: ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
+    
+    max_velocity: float
+        Largest velocity galaxy can have with respect to cluster centre in km/s
+    
+    linking_length_factor: float
+        Factor for transverse linking length (0 < x < 1)
+    
+    virial_radius: float 
+        Maximum radial boundary of cluster in Mpc
+    
+    check_map: bool
+        Plot a scatter plot to check cluster candidates
+
+    Returns
+    -------
+    final_candidates: dict
+        Dictionary of cluster candidates in the given format:
+            key: tuple
+                Cluster center with properties: 
+            value: array-like
+                Array of all members belonging to this cluster center
+    -------
     '''
 
     candidates = {}
@@ -285,13 +321,22 @@ def FoF(galaxy_data, center_data, max_velocity, linking_length_factor, virial_ra
     return final_candidates
 
 
-
 def create_df(d):
+    '''Create two dataframes to store cluster information
+
+    Parameters
+    ----------
+    d: dict (k:v -> bcg: cluster members)
+    
+    Returns
+    -------
+    bcg_df: pd.Dataframe
+    df of cluster centers: ['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'gal_id', 'cluster_id']
+
+    member_galaxy_df: pd.Dataframe
+    df of member galaxies: ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'cluster_id']
     '''
-    Create two dataframes to store cluster information
-    1. BCG table ['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'gal_id', 'cluster_id']
-    2. Member galaxy table ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'cluster_id']
-    '''
+
     bcg_list = [k for k in d.keys()]
     columns = ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'doppler_velocity']
     bcg_df = pd.DataFrame(columns=columns+['richness']).fillna(0)
@@ -319,13 +364,24 @@ def create_df(d):
 
 
 def interloper_removal(cluster_center, cluster_members):
+    ''' Removes interlopers of an individual cluster using the max velocity and virial radius approach.
 
-    '''
-    - calculate virial mass and use it to:
-        - calculate virial radius
-        - calculate max velocity
-    - repeat until converge
-    TODO: find max_velocity of galaxies in LOS of cluster center
+    The virial mass is estimated and used to calculate the virial radius and maximum velocity of a cluster. 
+    Galaxies that lie outside the virial radius or have a larger than maximum velocity are removed. The process is repeated until convergence.
+    If number of galaxies < 20, cluster is deleted.
+
+    Parameters
+    ----------
+    cluster_center: tuple
+        Cluster center candidate
+
+    cluster_members: array-like
+        Array of cluster members
+
+    Returns
+    -------
+    cleaned_members: array-like
+        Cleaned array of cluster members
     '''
 
     def v_cir(M, r):
@@ -335,6 +391,34 @@ def interloper_removal(cluster_center, cluster_members):
         return v_cir*2**(1/2)
 
     def max_velocity(cluster_center, cluster_members, virial_radius, tree, n):
+
+        '''
+        Calculation of maximum velocity (see Wojtak, R. et al., (2007). Interloper treatment in dynamical modelling of galaxy clusters.). 
+        The max velocity is calculated from the infall and circular velocity with max(v_inf*cos(theta),v_cir*sin(theta))
+
+        Parameters
+        ----------
+        cluster_center: tuple
+        Cluster center
+
+        cluster_members: array-like
+        Array of cluster members
+
+        virial_radius: float
+        Virial radius in Mpc
+
+        tree: cKDtree
+            Binary search tree of cluster members
+
+        n: int
+            Number of bins to split plane into
+
+
+        Returns
+        -------
+        final_members: array-like
+            Array of members with velocity < max velocity
+        '''
         
         r_ij = np.zeros((n,n))
         R = np.linspace(0, virial_radius, n) # bin projected plane into n steps
@@ -367,7 +451,7 @@ def interloper_removal(cluster_center, cluster_members):
         for k in c_mem.keys(): # evaluate mass of galaxies in concentric bins
             if len(c_mem[k]) > 1:
                 if (len(c_mem[k]) - len(c_mem[k-1])) != 0:
-                    M[k] = vm_estimator(c_mem[k], cluster_redshift)[0].value
+                    M[k] = virial_mass_estimator(c_mem[k], cluster_redshift)[0].value
                 else:
                     M[k] = M[k-1] # if num of galaxies does not change, mass remains the same
 
@@ -398,8 +482,25 @@ def interloper_removal(cluster_center, cluster_members):
 
         return final_members
 
-    def virial_radius_estimator(virial_mass, photo_z):
-        critical_density = cosmo.critical_density(z=photo_z)
+    def virial_radius_estimator(virial_mass, redshift):
+        '''
+        Calculation of virial radius
+
+        Parameters
+        ----------
+        virial_mass: float, array-like
+            Virial mass of object in M_sun
+
+        redshift: float, array-like
+            Redshift
+
+        Returns
+        -------
+        virial_radius: float, array-like
+            Virial radius in Mpc
+        '''
+
+        critical_density = cosmo.critical_density(z=redshift)
         r_200 = virial_mass/(200*np.pi*4/3*critical_density)
         return (r_200**(1/3)).to(u.Mpc)
 
@@ -412,7 +513,7 @@ def interloper_removal(cluster_center, cluster_members):
     while (size_change != 0) and (len(cleaned_members) > 0): # repeat until convergence
 
         size_before = len(cleaned_members)
-        virial_mass, _, _ = vm_estimator(cluster_members, np.median(cluster_members[:,2]))
+        virial_mass, _, _ = virial_mass_estimator(cluster_members, np.median(cluster_members[:,2]))
         
         virial_radius = virial_radius_estimator(virial_mass, cluster_center[2]).value
         tree = cKDTree(cleaned_members[:,:2])
@@ -434,7 +535,46 @@ def interloper_removal(cluster_center, cluster_members):
 
     
 def cluster_search(galaxy_data, center_data, max_velocity, linking_length_factor, virial_radius, check_map=True, export=False, fname=''):
+    '''
+    Performs a FoF search for cluster candidates, followed by removal of interlopers. Saves the data to a pandas dataframe.
+
+    Parameters
+    ----------
+    galaxy_data: array-like
+        Galaxy data with properties: ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
+    
+    center_data: array-like 
+        Cluster center candidate data with properties: ['ra', 'dec', 'photoz', 'luminosity', 'id', 'doppler_velocity']
+    
+    max_velocity: float
+        Largest velocity galaxy can have with respect to cluster centre in km/s
+    
+    linking_length_factor: float
+        Factor for transverse linking length (0 < x < 1)
+    
+    virial_radius: float 
+        Maximum radial boundary of cluster in Mpc
+
+    check_map: bool (default: True)
+        Plot a scatter plot to check cluster members
+
+    export: bool (default: False)
+        Exports df to csv file with filename fname
+
+    fname: str (default: empty)
+        Filename of csv file to be exported, if export=True.
+
+    Returns
+    -------
+    bcg_df: pd.Dataframe
+        df of cluster centers
+
+    member_df: pd.Dataframe
+        df of members in clusters
+    '''
+
     candidates = FoF(galaxy_data, center_data, max_velocity=max_velocity, linking_length_factor=linking_length_factor, virial_radius=virial_radius, check_map=check_map)
+
     candidate_df, candidate_member_df = create_df(candidates)
     if export:
         candidate_df.to_csv(fname + '_candidate_bcg.csv', index=False)
@@ -459,6 +599,24 @@ def cluster_search(galaxy_data, center_data, max_velocity, linking_length_factor
 
 
 if __name__ == "__main__":
+
+    # -- preparing COSMOS photometric data
+    # df = pd.read_csv('datasets/cosmos2015_filtered.csv')
+    # df = df.loc[:, ['ALPHA_J2000', 'DELTA_J2000', 'PHOTOZ', 'MR', 'NUMBER']]
+
+    # # select from 0.5 <= z <= 1.0 and L >= -40
+    # df = df.loc[(df['PHOTOZ'] <= 1.0) & (df['PHOTOZ'] >= 0.5)] # & (df['MR'] >= -40)
+    # galaxy_arr = np.asarray(df)
+
+    # galaxy_arr = galaxy_arr[galaxy_arr[:,2].argsort()] # sort by redshift
+    # galaxy_arr = np.hstack((galaxy_arr, np.zeros((galaxy_arr.shape[0], 1)))) # add column for galaxy velocity
+
+    # galaxy_arr[:,-1] = redshift_to_velocity(galaxy_arr[:,2]).to('km/s').value
+    # luminous_galaxy_data = galaxy_arr[galaxy_arr[:,3] <= -20.5] # filter for galaxies brighter than -20.5
+
+    # fig = plt.figure(figsize=(10,8))
+    # plt.hist2d(data['ALPHA_J2000'], data['DELTA_J2000'], bins=(100,80))
+    # plt.show()
 
     # -- testing cluster_search function
     bcg_df, member_galaxy_df = cluster_search(galaxy_arr, luminous_galaxy_data, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, check_map=True, export=True, fname='test')
@@ -485,7 +643,7 @@ if __name__ == "__main__":
     # for g in group_n[:100]:
     #     cluster = arr[arr[:,-1]==g]
     #     bcg = bcg_arr[int(g),:]
-    #     mass, vel_disp, rad = vm_estimator(cluster[:,:3], bcg[-1])
+    #     mass, vel_disp, rad = virial_mass_estimator(cluster[:,:3], bcg[-1])
     #     masses[int(g)] = mass.value
 
     # np.savetxt(fname='cluster_masses.txt', X=masses)
