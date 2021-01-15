@@ -1,11 +1,11 @@
 
 KEY TASKS
-1. Remove galaxies from edges, corners and masked areas
-2. Correct for Malmquist bias - 1. Cut data; 2. Fit Gaussian curve
-3. Apply selection criteria from Abell Catalogue
+1. Remove galaxies from edges, corners and masked areas (DONE?)
+2. Correct for Malmquist bias - 1. Cut data (DONE)
+3. Apply selection criteria from Abell Catalogue 
 4. Obtain cluster sample (before and after interloper removal)
 5. Obtain mass estimates (add mass, virial radius, velocity dispersion to database)
-6. Compare projected mass and virial mass estimates
+6. Compare projected mass and virial mass estimates (DONE)
 7. Apply catalogue matching and richness accuracy test to compare between cluster sample and catalogues
 8. Compare sample masses with catalogue masses (X-ray group catalogue)
 

@@ -4,8 +4,6 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Table
 
-# ---
-# Import astropy fits datasets to pandas df
 
 def fits_to_df(fname):
     ''' Imports table from fits files and converts them to Pandas dataframes.
@@ -32,7 +30,7 @@ def fits_to_df(fname):
     return df
 
 
-def split_df_into_groups(df, column):
+def split_df_into_groups(df, column, n):
     ''' Splits df of group members into groups
 
     Parameters
@@ -42,6 +40,9 @@ def split_df_into_groups(df, column):
 
     column: str
         Name of column to sort and group by
+    
+    n: int
+        Index of column to group by
 
     Returns
     -------
@@ -53,14 +54,17 @@ def split_df_into_groups(df, column):
 
     '''
     arr = df.sort_values(column).values
-    group_n = np.unique(arr[:,-1])
+    group_n = np.unique(arr[:,n])
     
     return arr, group_n
 
 
 # cosmic_web_df = fits_to_df('J_ApJ_837_16_table1.dat.gz.fits')
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
-# xray_df = fits_to_df('')
+xray_df = pd.read_csv('datasets\\xray_group_catalog_tbl.csv')
+xray_members_df = pd.read_csv('datasets\\xray_group_member_catalog_tbl.csv')
+# xmm_df = fits_to_df('datasets\J_ApJS_172_182_table1.dat.fits')
+
 
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
@@ -76,12 +80,13 @@ def drop_null(df):
     if sum(check_null(df)):
         return df.dropna()
 
+
 # -- cosmic_web
-# cosmic_web_df = cosmic_web_df[(cosmic_web_df['Flag']==0) & (cosmic_web_df['Ngroup'] != -99)]
-# cosmic_web_df.drop(['Den', 'Oden', 'SCl', 'SFil', 'CWE', 'Flag'], axis=1, inplace=True)
-# cosmic_web_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'group', 'Ngal', 'type']
+# cosmic_web_df = cosmic_web_df[(cosmic_web_df['Ngroup'] != -99)]
+# cosmic_web_df.drop(['SCl', 'SFil', 'Flag'], axis=1, inplace=True)
+# cosmic_web_df.columns = ['COSMOS2015_id', 'ra', 'dec', 'redshift', 'density', 'overdensity', 'environment', 'cluster_id', 'Ngal', 'type']
 # cosmic_web_df['type'] = cosmic_web_df['type'].str.rstrip()
-# cosmic_web_members_df = cosmic_web_df[cosmic_web_df['type']=='satellite'] # member gal array
+# cosmic_web_members_df = cosmic_web_df[cosmic_web_df['type']!='isolated'] # member gal array
 # cosmic_web_df = cosmic_web_df[cosmic_web_df['type']=='central'] # center gal array
 
 
@@ -92,8 +97,12 @@ def drop_null(df):
 
 
 # -- xray
-# xray_df = xray_df[]
+# xray_members_df = drop_null(xray_members_df)
+# xray_members_df = xray_members_df[xray_members_df['group_flag_zbest']==1]
+# xray_df = drop_columns(xray_df, ['nmem_w','flag_include','xflag'])
+# xray_members_df = drop_columns(xray_members_df, ['mag_auto', 'p_mem', 'group_id','group_flag','dist_mmggs','group_flag_zbest','mnuv_mr', 'mmggs', 'p_mem_zbest'])
 
+# -- xmm
 
 
 # --- Add datasets to database, form cleaned csv file
@@ -125,9 +134,10 @@ def add_data(df, name):
     add_to_db(df, name)
 
 
-# add_data(cosmic_web_df, 'cosmic_web')
+# add_data(cosmic_web_df, 'cosmic_web_bcg')
 # add_data(cosmic_web_members_df, 'cosmic_web_members')
 # add_data(deep_field_df, 'deep_field')
-# add_data(xray_df, 'xray')
-# add_data(xray_members_df, 'xray_members')
+# add_to_db(xray_df, 'xray')
+# add_to_db(xray_members_df, 'xray_members')
+
 
