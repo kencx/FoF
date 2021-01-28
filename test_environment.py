@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-# from virial_mass_estimator import virial_mass_estimator
 import sqlite3
 
 from astropy import units as u

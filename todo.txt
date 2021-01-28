@@ -1,22 +1,57 @@
 
-KEY TASKS
-1. Remove galaxies from edges, corners and masked areas (DONE?)
-2. Correct for Malmquist bias - 1. Cut data (DONE)
-3. Apply selection criteria from Abell Catalogue 
-4. Obtain cluster sample (before and after interloper removal)
-5. Obtain mass estimates (add mass, virial radius, velocity dispersion to database)
-6. Compare projected mass and virial mass estimates (DONE)
-7. Apply catalogue matching and richness accuracy test to compare between cluster sample and catalogues
-8. Compare sample masses with catalogue masses (X-ray group catalogue)
+CLUSTER FINDING AND MASS ESTIMATION
+1. Remove galaxies from edges, corners and masked areas (DONE)
+2. Correct for Malmquist bias - Cut data at peak (DONE)
+3. Obtain cluster sample for 0.5 < z < 2.5 (DONE)
+    3.1 Check through sample and filter them 
+    3.2 Apply catalogue matching, richness accuracy test and cluster mass to compare between cluster sample and catalogues (DONE)
+    3.3 Interloper removal (Add to DB but do not replace!) (DONE)
+4. Obtain mass estimates (DONE)
+    5.1 Perform mass correction (DONE but weird results)
+    5.2. Compare projected mass and corrected virial mass (DONE)
+5. Obtain parameters for all clusters and add to DB
+    1. Cluster Mass before interloper removal 
+    2. Cluster Mass after interloper removal
+    3. Virial radius
+    4. Cluster velocity dispersion
+    5. Others?
+6. Plotting
+
+
+ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE
+7. Compare evolution of substructure in clusters [DYNAMICAL STATE]
+    1. Identify substructure with substructure tests (Dressler & Shectman, 1988)
+8. Compare evolution of density profile and compare to NFW profile [FORMATION TIME]
+    1. Plot NFW profile
+    2. Plot normalized median density profile (how?) wrt to radius 
+9. Observe for correlation between mass change across redshift bins and expected virial relation [GLOBAL MASS FUNCTION]
+    1. Bin sample into redshift bins
+    2. Calculate median masses in each bin
+    3. Plot mass change wrt to redshift bins
+    4. Calculate KE and PE of entire cluster (how? Account for substructure, scatter?)
+10. Test Press & Schechter (P&S) formalism for self-similar evolution (Qualitative?)
+    1. Plot and analyze global cluster mass function (how?). 
+    2. Can relate to cosmological parameters?
+11. Examine differences of clusters with different N or R
+
+
 
 SEMI IMPORTANT
-1. Obtain max_velocity of galaxies on the same LOS as center
-2. Apply mass weighting to virial_mass_estimator
+1. Apply mass weighting to virial_mass_estimator
+2. Compare sample masses with catalogue masses
+3. Calculate uncertainties (astropy bootstrap method)
+    1. Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
 
-SPEED TASKS
-1. Speed up virial_mass_estimator
-2. Speed up interloper_removal
 
+4. Look into standardizing units of little h (Croton, 2013)
+    1. Astropy littleh equivalence
+
+
+
+
+OPTIONAL
+1. Do Voronoi tessellation?
+2. Join with SDSS masses and compare
 
 SELECTION CRITERIA FOR ABELL CATALOGUE
 A cluster of galaxies listed in the Abell Catalogue. 

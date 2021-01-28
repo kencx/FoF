@@ -61,10 +61,7 @@ def split_df_into_groups(df, column, n):
 
 # cosmic_web_df = fits_to_df('J_ApJ_837_16_table1.dat.gz.fits')
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
-xray_df = pd.read_csv('datasets\\xray_group_catalog_tbl.csv')
-xray_members_df = pd.read_csv('datasets\\xray_group_member_catalog_tbl.csv')
-# xmm_df = fits_to_df('datasets\J_ApJS_172_182_table1.dat.fits')
-
+# gal_weight_df = fits_to_df('J_ApJS_246_2_galwcls.dat.gz.fits')
 
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
@@ -96,13 +93,9 @@ def drop_null(df):
 # deep_field_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'zs', 'mag', 'Ngal', 'R', 'Ltot']
 
 
-# -- xray
-# xray_members_df = drop_null(xray_members_df)
-# xray_members_df = xray_members_df[xray_members_df['group_flag_zbest']==1]
-# xray_df = drop_columns(xray_df, ['nmem_w','flag_include','xflag'])
-# xray_members_df = drop_columns(xray_members_df, ['mag_auto', 'p_mem', 'group_id','group_flag','dist_mmggs','group_flag_zbest','mnuv_mr', 'mmggs', 'p_mem_zbest'])
-
-# -- xmm
+# -- galweight
+# gal_weight_df = gal_weight_df[['ClID', 'RAdeg', 'DEdeg', 'z', 'RV', 'r200', 'N200', 'sig200', 'M200', 'Rs', 'Ms', 'conc']]
+# gal_weight_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'RV', 'r200', 'N200', 'sig200', 'M200', 'Rs', 'Ms', 'conc']
 
 
 # --- Add datasets to database, form cleaned csv file
@@ -137,7 +130,16 @@ def add_data(df, name):
 # add_data(cosmic_web_df, 'cosmic_web_bcg')
 # add_data(cosmic_web_members_df, 'cosmic_web_members')
 # add_data(deep_field_df, 'deep_field')
-# add_to_db(xray_df, 'xray')
-# add_to_db(xray_members_df, 'xray_members')
+# add_data(gal_weight_df, 'gal_weight')
 
 
+# --- database management
+
+def print_tables():
+    conn = sqlite3.connect('galaxy_clusters.db')
+    c = conn.cursor()
+    c.execute('''SELECT name FROM sqlite_master WHERE type="table"''')
+    print(c.fetchall())
+    conn.close()
+
+# print_tables()
