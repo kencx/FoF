@@ -57,14 +57,13 @@ plt.rc('font', family='serif', size=14)
 # ---------------------- Mass against redshift -----------------------------
 # bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv')
 # bcg_arr = bcg_df.sort_values('cluster_id').values
-# masses = np.loadtxt('derived_datasets\\filtered_virial_masses.txt')
-# corrected_mass = np.loadtxt('corrected_masses.txt')
+# masses = np.loadtxt('derived_datasets\\test_virial_masses.txt')
 
 # k, = np.where(bcg_arr[:,2] <= 2.5)
 # bcg_arr = bcg_arr[k,:]
 # masses = masses[k]
 
-# bins = np.arange(0.5,1.5+0.2,0.2)
+# bins = np.arange(0.5,2.0+0.2,0.2)
 # digitized = np.digitize(bcg_arr[:,2], bins, right=True)
 # mass_curve = []
 
@@ -83,9 +82,9 @@ plt.rc('font', family='serif', size=14)
 
 # fig, ax = plt.subplots(figsize=(12,8))
 # p = ax.scatter(bcg_arr[:,2], np.log10(masses), s=8, alpha=0.75, label='Cluster Mass')
-# # ax.scatter(bcg_arr[:,2], np.log10(corrected_mass), s=8, alpha=0.75, label='Corrected Mass')
-# # ax.plot(bins, np.log10(mass_curve), 'r--', label='Median log($\mathrm{M/M_\odot}$)')
-# # cbar = fig.colorbar(p)
+# ax.scatter(bcg_arr[:,2], np.log10(corrected_mass), s=8, alpha=0.75, label='Corrected Mass')
+# ax.plot(bins, np.log10(mass_curve), 'r--', label='Median log($\mathrm{M/M_\odot}$)')
+# cbar = fig.colorbar(p)
 
 
 # ax.set_title('Mass against redshift')
@@ -97,8 +96,8 @@ plt.rc('font', family='serif', size=14)
 # ax.ticklabel_format(style='sci', axis='y')
 # ax.yaxis.major.formatter._useMathText = True
 
-# ax.set_xlim(0.5,1.5)
-# ax.set_ylim(14.6,16.0)
+# ax.set_xlim(0.5,2.0)
+# ax.set_ylim(14.5,15.8)
 # ax.legend(frameon=False)
 # plt.show()
 
@@ -209,25 +208,28 @@ from data_processing import split_df_into_groups
 
 
 # ------ richness against mass
-bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv').sort_values('cluster_id')
-member_df = pd.read_csv('derived_datasets\\filtered_members.csv')
-virial = np.loadtxt('derived_datasets\\filtered_virial_masses.txt')
+# bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv').sort_values('cluster_id')
+# member_df = pd.read_csv('derived_datasets\\filtered_members.csv')
+# virial = np.loadtxt('derived_datasets\\test_virial_masses.txt')
 
-bcg_df = bcg_df[bcg_df['redshift'] <= 2.5]
-k, = np.where(bcg_df['redshift'] <= 2.5)
-# virial = virial[k]
+# bcg_df = bcg_df[bcg_df['redshift'] <= 2.5]
+# k, = np.where(bcg_df['redshift'] <= 2.5)
+# # virial = virial[k]
 
-bcg_arr = bcg_df.values
-arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
-total_lum = np.zeros(len(group_n))
+# bcg_arr = bcg_df.values
+# arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
+# total_lum = np.zeros(len(group_n))
 
-for i, g in enumerate(group_n):
-    center = bcg_arr[bcg_arr[:,-1]==g]
-    cluster_members = arr[arr[:,-1]==g]
-    lum2 = cluster_members[cluster_members[:,3].argsort()][2,3]
-    total_lum[i] = lum2
+# for i, g in enumerate(group_n):
+#     center = bcg_arr[bcg_arr[:,-1]==g]
+#     cluster_members = arr[arr[:,-1]==g]
+#     lum2 = cluster_members[cluster_members[:,3].argsort()][2,3]
+#     total_lum[i] = lum2
 
+# X = np.linspace(min(bcg_df['total_N']),max(bcg_df['total_N']),100)
+# m,c,r,_,_ = linregress(bcg_df['total_N'], virial)
 
-fig, ax = plt.subplots(figsize=(12,8))
-ax.scatter(bcg_df['total_N'], total_lum, s=8)
-plt.show()
+# fig, ax = plt.subplots(figsize=(12,8))
+# ax.scatter(bcg_df['total_N'], virial, s=8)
+# ax.plot(X, m*X+c, '--')
+# plt.show()

@@ -72,7 +72,7 @@ def virial_mass_estimator(cluster_members): # INCLUDE MASS WEIGHTING
     photoz_arr = cluster_members[:,2]
 
     average_redshift = np.mean(photoz_arr)
-    cluster_vel = (redshift_to_velocity(photoz_arr) - redshift_to_velocity(average_redshift))/(1+average_redshift)
+    cluster_vel = (redshift_to_velocity(photoz_arr) - redshift_to_velocity(average_redshift))# /(1+average_redshift)
     cluster_vel_disp = velocity_dispersion(cluster_vel, cluster_size)
 
     # galaxy separations
@@ -99,7 +99,7 @@ def projected_mass_estimator(cluster_center, cluster_members):
     N = len(cluster_members)
 
     average_redshift = np.mean(cluster_members[:,2])
-    cluster_velocity = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(average_redshift))/(1+average_redshift) # in km/s
+    cluster_velocity = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(average_redshift)) #/(1+average_redshift) # in km/s
 
     c = SkyCoord(ra=cluster_members[:,0]*u.degree, dec=cluster_members[:,1]*u.degree)
     centroid = SkyCoord(ra=np.mean(cluster_members[:,0])*u.degree, dec=np.mean(cluster_members[:,1])*u.degree)

@@ -498,17 +498,17 @@ def create_cleaned_df(d):
 if __name__ == "__main__":
 
     # --- cluster search
-    print('Selecting galaxy survey...')
-    conn = sqlite3.connect('galaxy_clusters.db')
-    df = pd.read_sql_query('''
-    SELECT *
-    FROM mag_lim
-    ORDER BY redshift
-    ''', conn)
+    # print('Selecting galaxy survey...')
+    # conn = sqlite3.connect('galaxy_clusters.db')
+    # df = pd.read_sql_query('''
+    # SELECT *
+    # FROM mag_lim
+    # ORDER BY redshift
+    # ''', conn)
 
-    df = df.loc[:, ['ra','dec','redshift','RMag','ID', 'LR']] # select relevant columns
-    df['Doppler_vel'] = redshift_to_velocity(df['redshift'])
-    df = df.sort_values('redshift')
+    # df = df.loc[:, ['ra','dec','redshift','RMag','ID', 'LR']] # select relevant columns
+    # df['Doppler_vel'] = redshift_to_velocity(df['redshift'])
+    # df = df.sort_values('redshift')
 
     # galaxy_arr = df.values
     # galaxy_arr, luminous_arr = luminous_search(galaxy_arr, max_velocity=2000)
@@ -518,19 +518,19 @@ if __name__ == "__main__":
     # galaxy_arr = np.loadtxt('raw_galaxy2.csv', delimiter=',')
     # luminous_arr = np.loadtxt('luminous_galaxy2.csv', delimiter=',')
 
-#     galaxy_arr = galaxy_arr[(galaxy_arr[:,2] > 0.5) & (galaxy_arr[:,2] <= 2.05)]
-#     luminous_arr = luminous_arr[(luminous_arr[:,2] > 0.5) & (luminous_arr[:,2] <= 2.05)]
-#     print('Number of galaxies: {galaxy}, Number of candidates: {luminous}'.format(galaxy=len(galaxy_arr), luminous=len(luminous_arr)))
+    # galaxy_arr = galaxy_arr[(galaxy_arr[:,2] > 0.5) & (galaxy_arr[:,2] <= 2.05)]
+    # luminous_arr = luminous_arr[(luminous_arr[:,2] > 0.5) & (luminous_arr[:,2] <= 2.05)]
+    # print('Number of galaxies: {galaxy}, Number of candidates: {luminous}'.format(galaxy=len(galaxy_arr), luminous=len(luminous_arr)))
 
-#     candidates = FoF(galaxy_arr, luminous_arr, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, check_map=False)
-#     print('{n} candidate clusters found.'.format(n=len(candidates)))
+    # candidates = FoF(galaxy_arr, luminous_arr, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, check_map=False)
+    # print('{n} candidate clusters found.'.format(n=len(candidates)))
 
-#     print('Exporting candidate clusters to csv...')
-#     candidate_df, candidate_member_df = create_candidate_df(candidates)
-#     fname = 'test2'
-#     candidate_df.to_csv(fname + '_candidate_bcg.csv', index=False)
-#     candidate_member_df.to_csv(fname + '_candidate_members.csv', index=False)
-# # 
+    # print('Exporting candidate clusters to csv...')
+    # candidate_df, candidate_member_df = create_candidate_df(candidates)
+    # fname = 'test2'
+    # candidate_df.to_csv(fname + '_candidate_bcg.csv', index=False)
+    # candidate_member_df.to_csv(fname + '_candidate_members.csv', index=False)
+
     # -- interloper removal
     # bcg_df = pd.read_csv('test2_candidate_bcg.csv')
     # member_df = pd.read_csv('test2_candidate_members.csv')
@@ -576,7 +576,7 @@ if __name__ == "__main__":
     # bcg_df = bcg_df.loc[bcg_df['cluster_id'].isin(member_id)]
     # assert len(bcg_df) == len(np.unique(member_df['cluster_id']))
 
-    # bcg_df = bcg_df[(bcg_df['richness'] >= 8) & (bcg_df['redshift'] <= 2.5) & (bcg_df['redshift'] >= 0.5)]
+    # bcg_df = bcg_df[(bcg_df['richness'] >= 8) & (bcg_df['redshift'] <= 2.05) & (bcg_df['redshift'] >= 0.5)]
     # bcg_id = bcg_df['cluster_id']
     # member_df = member_df.loc[member_df['cluster_id'].isin(bcg_id)]
 
@@ -609,9 +609,9 @@ if __name__ == "__main__":
 
         # masses = np.loadtxt('{f}_{m}_masses.txt'.format(f=fname, m=estimator))
 
-        i, = np.where(bcg_arr[:,2] < 2.50)
-        bcg_arr = bcg_arr[i,:]
-        masses = masses[i]
+        # i, = np.where(bcg_arr[:,2] < 2.50)
+        # bcg_arr = bcg_arr[i,:]
+        # masses = masses[i]
 
         # j, = np.where(masses<2e16)
         # bcg_arr = bcg_arr[j,:]
@@ -634,11 +634,11 @@ if __name__ == "__main__":
         # ax.plot(x,a*x+b,'k--',alpha=0.75)
         # print(r)
 
-        ax.set_xlim(0.5,2.55)
+        ax.set_xlim(0.5,2.05)
         # ax.set_ylim(0,6e15)
         plt.show()
 
-    # test_masses('filtered_bcg.csv', 'filtered_members.csv', estimator='projected', fname='derived_datasets\\test')
+    # test_masses('filtered_bcg.csv', 'filtered_members.csv', estimator='virial', fname='test')
 
     def compare_masses(projected_masses, virial_masses):
         projected = np.loadtxt(projected_masses)
@@ -667,7 +667,7 @@ if __name__ == "__main__":
         
         plt.show()
 
-    # compare_masses('derived_datasets\\test_projected_masses.txt', 'derived_datasets\\test_virial_masses.txt')
+    # compare_masses('test_projected_masses.txt', 'test_virial_masses.txt')
 
     # -- plotting clusters for manual checking
     # import logging
