@@ -1,19 +1,23 @@
 # import time
+import pickle
 import numpy as np
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
 # import seaborn as sns
+from random import uniform
 
 from scipy.spatial import cKDTree, distance
 from scipy.stats import norm, linregress
 
 from astropy import units as u
 from astropy.constants import G
-from astropy.cosmology import WMAP5 as cosmo
+from astropy.cosmology import LambdaCDM
 
 from mass_estimator import virial_mass_estimator, redshift_to_velocity, projected_mass_estimator
 from data_processing import split_df_into_groups, add_to_db
+
+cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
 
 def linear_to_angular_dist(distance, photo_z):
@@ -23,7 +27,7 @@ def linear_to_angular_dist(distance, photo_z):
     Parameters
     ----------
     distance: float, array-like
-        Distance in Mpc
+        Distance in h^-1 * Mpc
 
     photo_z: float, array-like
         Associated redshift
@@ -34,7 +38,7 @@ def linear_to_angular_dist(distance, photo_z):
         Angular distance in deg
     '''
 
-    return ((distance*u.Mpc) * cosmo.arcsec_per_kpc_proper(photo_z)).to(u.deg)
+    return (distance.to(u.Mpc, u.with_H0(cosmo.H0)) * cosmo.arcsec_per_kpc_proper(photo_z)).to(u.deg)
 
 
 def mean_separation(n, radius):
@@ -60,11 +64,35 @@ def mean_separation(n, radius):
     return 1/(density**(1/3))
 
 
-def find_richness(point, member_galaxies, distance):
-    richness_tree = cKDTree(member_galaxies[:,:2])
-    r_idx = richness_tree.query_ball_point(point[:2], linear_to_angular_dist(distance, point[2]).value)
-    r_arr = member_galaxies[r_idx]
-    return len(r_arr)
+def find_number_count(center, member_galaxies, distance):
+    N_tree = cKDTree(member_galaxies[:,:2])
+    n_idx = N_tree.query_ball_point(center[:2], linear_to_angular_dist(distance, center[2]).value)
+    n_arr = member_galaxies[n_idx]
+    return len(n_arr)
+
+
+def center_overdensity(center, galaxy_data, max_velocity):
+    # select 300 random points (RA and dec)
+    n = 300
+    ra_random = np.random.uniform(low=min(galaxy_data[:,0]), high=max(galaxy_data[:,0]), size=n)
+    dec_random = np.random.uniform(low=min(galaxy_data[:,1]), high=max(galaxy_data[:,1]), size=n)
+    points = np.vstack((ra_random, dec_random)).T
+    assert points.shape == (n,2)
+
+    # select all galaxies within max velocity
+    velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2])-redshift_to_velocity(center[2]))/(1+center[2]) <= max_velocity*u.km/u.s]
+    virial_tree = cKDTree(velocity_bin[:,:2])
+
+    # find the N(0.5) mean and rms for the 300 points
+    N_arr = np.zeros(n)
+    for i, p in enumerate(points):
+        idx = virial_tree.query_ball_point(p, linear_to_angular_dist(0.5*u.Mpc/u.littleh, center[2]).value)
+        N_arr[i] = len(idx)
+
+    N_mean = np.mean(N_arr)
+    N_rms = np.sqrt(np.mean(N_arr**2)) #rms
+
+    return N_mean, N_rms
 
 
 def luminous_search(galaxy_data, max_velocity):
@@ -72,50 +100,49 @@ def luminous_search(galaxy_data, max_velocity):
     Parameters
     ----------
     galaxy_data: array-like
-        Galaxy data with properties: ['ra', 'dec', 'photoz', 'abs mag', 'id', 'LR', 'doppler_velocity']
+        Galaxy data with properties: ['ra', 'dec', 'photoz', 'abs mag', 'id', 'LR']
 
     max_velocity: float
-        Largest velocity galaxy can have with respect to cluster centre in km/s.
+        Largest velocity a galaxy can have with respect to the cluster center in km/s
 
     Returns
     -------
     galaxy_data: array-like
-        Galaxy data with additional column of N(0.5). N(0.5) is the number of galaxies within 0.5Mpc of the galaxy.
+        Galaxy data with additional column of N(0.5). N(0.5) is the number of galaxies within 0.5h^-1 Mpc of the galaxy.
 
     luminous_galaxy: array-like
         Sample of galaxy_data with galaxies of N(0.5) >= 8 and sorted by decreasing N(0.5). 
     '''
     
-    # add additional column to galaxy_data
+    # add additional N(0.5) column to galaxy_data
     N = galaxy_data.shape
     temp = np.zeros((N[0], N[1]+1))
     temp[:,:-1] = galaxy_data
     galaxy_data = temp
-
     assert galaxy_data.shape[1] == N[1]+1, 'Galaxy array is wrong shape.'
-    
-    for i, galaxy in enumerate(galaxy_data): # count N(0.5) for each galaxy
-        vel_cutoff = galaxy_data[abs(galaxy_data[:,-2]-galaxy[-2]) <= max_velocity] # select for galaxies within max_velocity
+
+    # count N(0.5) for each galaxy
+    for i, galaxy in enumerate(galaxy_data): 
+        vel_cutoff = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2])-redshift_to_velocity(galaxy[2]))/(1+galaxy[2]) <= max_velocity*u.km/u.s] # select galaxies within appropriate redshift range
 
         if len(vel_cutoff) > 1:
             galaxy_tree = cKDTree(vel_cutoff[:,:2])
-            N_idx = galaxy_tree.query_ball_point(galaxy[:2], linear_to_angular_dist(0.5, galaxy[2]).value) # select for galaxies within 0.5Mpc
+            N_idx = galaxy_tree.query_ball_point(galaxy[:2], linear_to_angular_dist(0.5*u.Mpc/u.littleh, galaxy[2]).value) # galaxies within 0.5 h^-1 Mpc
             galaxy_data[i,-1] = len(N_idx)
         else:
             galaxy_data[i,-1] = 0
 
     galaxy_data = galaxy_data[galaxy_data[:,-1].argsort()[::-1]] # sort by N(0.5)
-    luminous_galaxy = galaxy_data[galaxy_data[:,-1] >= 8] # select for galaxies with N(0.5) >= 8 (this is our center sample)
-    
     assert galaxy_data[0,-1] == max(galaxy_data[:,-1]), 'Galaxy array is not sorted by N(0.5)'
+
+    luminous_galaxy = galaxy_data[galaxy_data[:,-1] >= 8] # select for galaxies with N(0.5) >= 8
     assert len(luminous_galaxy[luminous_galaxy[:,-1] < 8]) == 0, 'Luminous galaxy array has galaxies with N(0.5) < 8'
 
-    print(len(galaxy_data), len(luminous_galaxy))
-
+    print('Total Number of Galaxies in sample: {ngd}, Number of candidate centers: {nlg}'.format(ngd=len(galaxy_data), nlg=len(luminous_galaxy)))
     return galaxy_data, luminous_galaxy
 
 
-def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_radius, check_map=True):
+def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_radius, richness, overdensity, check_map=True):
     '''
     Steps
     -----
@@ -131,19 +158,20 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     Parameters
     ----------
     galaxy_data: array-like
-        Galaxy data with properties: ['ra', 'dec', 'photoz', 'abs mag', 'id', 'doppler_velocity', 'N(0.5)']
+    
+        Galaxy data with properties: ['ra', 'dec', 'redshift', 'abs mag', 'ID', 'luminosity', 'N(0.5)']
     
     luminous_data: array-like 
-        Cluster center candidate data with properties: ['ra', 'dec', 'photoz', 'abs mag', 'id', 'doppler_velocity', 'N(0.5)']
+        Cluster center candidate data with properties: ['ra', 'dec', 'photoz', 'abs mag', 'ID', 'luminosity', 'N(0.5)']
     
     max_velocity: float
-        Largest velocity galaxy can have with respect to cluster centre in km/s
+        Largest velocity a galaxy can have with respect to the cluster center in km/s
     
     linking_length_factor: float
         Factor for transverse linking length (0 < x < 1)
     
     virial_radius: float 
-        Maximum radial boundary of cluster in Mpc
+        Maximum radial boundary of cluster in h^-1 Mpc
     
     check_map: bool
         Plot a scatter plot to check cluster candidates
@@ -160,23 +188,23 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
 
     candidates = {}
 
-    for i, center in enumerate(luminous_data):
-        velocity_cutoff = galaxy_data[abs(galaxy_data[:,-2]-center[-2]) <= max_velocity] # select for galaxies within max_velocity of candidate center
+    for i, center in enumerate(luminous_data): # for each luminous galaxy candidate
+        velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2])-redshift_to_velocity(center[2]))/(1+center[2]) <= max_velocity*u.km/u.s] # select galaxies within max velocity
 
-        virial_tree = cKDTree(velocity_cutoff[:,:2])
+        virial_tree = cKDTree(velocity_bin[:,:2])
         transverse_virial_idx = virial_tree.query_ball_point(center[:2], linear_to_angular_dist(virial_radius, center[2]).value)
-        transverse_virial_points = velocity_cutoff[transverse_virial_idx] # galaxies within virial radius of 2 Mpc
+        transverse_virial_points = velocity_bin[transverse_virial_idx] # and select galaxies within virial radius
 
         if len(transverse_virial_points):
-            mean_sep = mean_separation(len(transverse_virial_points), virial_radius) # in Mpc
-            transverse_linking_length = linking_length_factor*mean_sep
+            mean_sep = mean_separation(len(transverse_virial_points), virial_radius) # in h^-1 Mpc
+            transverse_linking_length = linking_length_factor*(mean_sep.to(u.Mpc, u.with_H0(cosmo.H0))).value # determine transverse LL from local mean separation
 
-            linking_tree = cKDTree(transverse_virial_points[:,:2]) 
-            link_idx = linking_tree.query_ball_point(center[:2], transverse_linking_length) # select all galaxies within linking length
-            f_points = transverse_virial_points[link_idx] # points within 1 linking length
+            linking_tree = cKDTree(transverse_virial_points[:,:2])
+            link_idx = linking_tree.query_ball_point(center[:2], transverse_linking_length) # select galaxies within linking length
+            f_points = transverse_virial_points[link_idx]
 
             for f in f_points[:,:2]:
-                fof_idx = linking_tree.query_ball_point(f, transverse_linking_length) # select for galaxies within 2 linking lengths (FoF)
+                fof_idx = linking_tree.query_ball_point(f, transverse_linking_length) # select galaxies within 2 linking lengths (FoF)
                 fof_points = transverse_virial_points[fof_idx]
 
                 mask = np.isin(fof_points, f_points, invert=True) # filter for points not already accounted for
@@ -185,22 +213,13 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
                 if len(fof_points):
                     f_points = np.concatenate((f_points, fof_points)) # merge all FoF points within 2 linking lengths
 
-            if len(f_points) >= 50: # must have >= 50 points
+            if len(f_points) >= richness: # must have >= richness (Abell richness criterion)
                 candidates[tuple(center)] = f_points # dictionary {galaxy centre: array of FoF points}
                 if not i % 100:
                     print('Candidate {num} identified with {length} members'.format(num=i, length=len(f_points)))
 
-        # if len(candidates) >= 50:
+        # if len(candidates) >= 50: # for quick testing
         #     break
-        
-
-    # if check_map:    
-    #     fig = plt.figure(figsize=(10,8))
-    #     for k, v in candidates.items():
-    #         plt.scatter(v[:,0], v[:,1], s=5)
-    #         plt.scatter(k[0], k[1])
-    #     plt.axis([min(galaxy_data[:,0]), max(galaxy_data[:,0]), min(galaxy_data[:,1]), max(galaxy_data[:,1])])
-    #     plt.show()
 
     '''
     Remove overlapping clusters
@@ -211,28 +230,28 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     4. Combine clusters with centers 0.25 x virial radius from each other. Likewise, the center with larger N(0.5) remains as the primary cluster 
     5. Search for member galaxies brighter than candidate cluster center within 0.25 x virial radius
     6. Replace the brightest galaxy as the new cluster center
-    7. Initialize the cluster only if richness >= 8 (richness is defined as the number of member galaxies within 0.25*virial radius)
+    7. Initialize the cluster only if N(0.5) >= 8 (number count is defined as the number of member galaxies within 0.25*virial radius)
     '''
 
     def setdiff2d(arr_1, arr_2): # finds common rows between two 2d arrays and return the rows of arr1 not present in arr2
-        arr_1_struc = arr_1.ravel().view(dtype=[('ra', np.float64), ('dec', np.float64), ('photoz', np.float64), ('brightness', np.float64), ('name', np.float64), ('LR', np.float64), ('doppler_velocity', np.float64), ('N(0.5)', np.float64)])
-        arr_2_struc = arr_2.ravel().view(dtype=[('ra', np.float64), ('dec', np.float64), ('photoz', np.float64), ('brightness', np.float64), ('name', np.float64), ('LR', np.float64), ('doppler_velocity', np.float64), ('N(0.5)', np.float64)])
+        arr_1_struc = arr_1.ravel().view(dtype=[('ra', np.float64), ('dec', np.float64), ('redshift', np.float64), ('brightness', np.float64), ('ID', np.float64), ('LR', np.float64), ('N(0.5)', np.float64)])
+        arr_2_struc = arr_2.ravel().view(dtype=[('ra', np.float64), ('dec', np.float64), ('redshift', np.float64), ('brightness', np.float64), ('ID', np.float64), ('LR', np.float64), ('N(0.5)', np.float64)])
         S = np.setdiff1d(arr_1_struc, arr_2_struc)
         return S
 
-    def new_centroid(member_galaxies):  # new center is defined by member galaxy that is the minimal distance away from all other member galaxies
-        center = [np.mean(member_galaxies[:,0]), np.mean(member_galaxies[:,1])]
-        member_tree = cKDTree(member_galaxies[:,:2])
-        distances, idx = member_tree.query(center, k=1) # search for k=1 nearest neighbour in member_galaxies
-        centroid = member_galaxies[idx]
-        return centroid
+    # def new_centroid(member_galaxies):  # new center is defined by member galaxy that is the minimal distance away from all other member galaxies
+    #     center = [np.mean(member_galaxies[:,0]), np.mean(member_galaxies[:,1])]
+    #     member_tree = cKDTree(member_galaxies[:,:2])
+    #     _, idx = member_tree.query(center, k=1) # search for k=1 nearest neighbour in member_galaxies
+    #     centroid = member_galaxies[idx]
+    #     return centroid
 
     def remove_overlap(merged_candidates, center, arr1, arr2):
         S = setdiff2d(arr1, arr2) # finds common rows between two arrays and return the rows of cen_arr not present in member_arr
         if len(S):
-            member_galaxies = S.view(np.float64).reshape(S.shape + (-1,)) # convert back to np array of original shape
-            new_center = new_centroid(member_galaxies) # locate new center for candidate
-            merged_candidates[tuple(new_center)] = member_galaxies # initialize new center
+            # member_galaxies = S.view(np.float64).reshape(S.shape + (-1,)) # convert back to np array of original shape
+            # new_center = new_centroid(member_galaxies) # locate new center for candidate
+            # merged_candidates[tuple(new_center)] = member_galaxies # initialize new center
             merged_candidates[center] = np.array([]) # delete old center
 
     def merge(merged_candidates, center1, center2):
@@ -245,25 +264,25 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     cluster_centers = np.array([k for k in candidates.keys()]) # array of cluster centers
     merged_candidates = candidates.copy()
 
-    for center, member_arr in candidates.items():
+    for center, member_arr in candidates.items(): # for each cluster candidate center
 
-        vel_cutoff = cluster_centers[abs(cluster_centers[:,-2] - center[-2]) <= max_velocity]
-        center_tree = cKDTree(vel_cutoff[:,:2])
+        velocity_bin = cluster_centers[abs(redshift_to_velocity(cluster_centers[:,2]) - redshift_to_velocity(center[2]))/(1+center[2]) <= max_velocity*u.km/u.s] # select clusters within max velocity
+        center_tree = cKDTree(velocity_bin[:,:2])
 
-        virial_center_idx = center_tree.query_ball_point(center[:2], linear_to_angular_dist(virial_radius, center[2]).value) # search for centers within virial radius
-        centers_within_vr = vel_cutoff[virial_center_idx]
+        virial_center_idx = center_tree.query_ball_point(center[:2], linear_to_angular_dist(virial_radius, center[2]).value) # and clusters within virial radius
+        centers_within_vr = velocity_bin[virial_center_idx] # these are our overlapping clusters (centers lie within another cluster's radius)
 
         # remove overlapping points
         if len(centers_within_vr):
             for cen in centers_within_vr:
                 cen = tuple(cen)
-                if center == cen:
+                if center == cen: # if same center, continue
                     continue
 
                 cen_arr = merged_candidates[cen]
-                if len(cen_arr) and len(member_arr): # check not empty
+                if len(cen_arr) and len(member_arr): # check both clusters are not empty
                     
-                    # compare size of two arrays and removes common points from smaller array. if both are same size, remove common points from less bright centre
+                    # compare N(0.5) of two clusters and removes the common galaxies from smaller cluster. if both are same N(0.5), remove common galaxies from cluster with less bright center galaxy
                     if center[-1] > cen[-1]: 
                         remove_overlap(merged_candidates, cen, cen_arr, member_arr)
 
@@ -277,22 +296,22 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
                         remove_overlap(merged_candidates, center, member_arr, cen_arr)
 
 
-        merge_idx = center_tree.query_ball_point(center[:2], linear_to_angular_dist(0.25*virial_radius, center[2]).value) # search for centers within 0.25*virial radius
-        merge_centers = vel_cutoff[merge_idx] # array of centers within 0.25*virial radius, to be merged with center galaxy
+        merge_idx = center_tree.query_ball_point(center[:2], linear_to_angular_dist(0.25*virial_radius, center[2]).value) # select centers within 0.25*virial radius
+        merge_centers = velocity_bin[merge_idx] # these cluster center lie too close to another center and will be merged into 1 cluster
 
         # merge cluster centers within 0.25*virial radius from current center
-        if len(merge_centers): # check not empty
+        if len(merge_centers): # check cluster not empty
             for mg in merge_centers:
                 mg = tuple(mg)
 
-                if center == mg:
+                if center == mg: # if same center, continue
                     continue
 
-                if ((mg in merged_candidates.keys())       # check if galaxy to be merged is still in candidate list
+                if ((mg in merged_candidates.keys())       # check if galaxy to be merged is still in candidate list (still exists)
                     and (len(merged_candidates[mg]))       # check if galaxy to be merged has member galaxies
                     and (len(merged_candidates[center]))): # check if center galaxy has member galaxies
                     
-                    # compare size of two arrays, keeps larger array with merged points and deletes smaller one. if both are same size, compare brightness instead
+                    # compare N(0.5) of two clusters, keep larger cluster with merged points and deletes smaller one. if both have same N(0.5), compare brightness instead
                     if mg[-1] > center[-1]:
                         merge(merged_candidates, mg, center)
 
@@ -305,9 +324,10 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
                     else:
                         merge(merged_candidates, center, mg)
 
-    # merged_candidates = {k: v for k,v in merged_candidates.items() if len(v)}
 
-    # fig = plt.figure(figsize=(10,8))
+    # merged_candidates = {k: v for k,v in merged_candidates.items() if len(v)} # for testing
+
+    # fig = plt.figure(figsize=(10,8)) # for checking plotting
     # count = 0
     # for k, v in merged_candidates.items():
     #     plt.scatter(v[:,0], v[:,1], s=5)
@@ -317,57 +337,60 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     #         plt.axis([min(galaxy_data[:,0]), max(galaxy_data[:,0]), min(galaxy_data[:,1]), max(galaxy_data[:,1])])
     #         plt.show()
 
-    merged_cluster_centers = np.array([k for k in merged_candidates.keys()])
-    merged_candidates = {k: v for k,v in merged_candidates.items() if len(v)>=50}
+
+    merged_cluster_centers = np.array([k for k in merged_candidates.keys()]) # array of cluster centers that have survived removal and merging
+    merged_candidates = {k: v for k,v in merged_candidates.items() if len(v)>=richness} # select only clusters with richness >= 50
     center_shifted_candidates = merged_candidates.copy()
 
+    # replace candidate center with brightest galaxy in cluster
     for mcenter, member_arr in merged_candidates.items():
 
-        # vel_cutoff = merged_cluster_centers[abs(merged_cluster_centers[:,-2] - mcenter[-2]) <= max_velocity]
-        center_tree = cKDTree(member_arr[:,:2])
-
-        bcg_idx = center_tree.query_ball_point(mcenter[:2], linear_to_angular_dist(0.25*virial_radius, mcenter[2]).value) # search for centers within 0.25*virial radius
+        cluster_tree = cKDTree(member_arr[:,:2]) # for galaxies within a cluster
+        bcg_idx = cluster_tree.query_ball_point(mcenter[:2], linear_to_angular_dist(0.25*virial_radius, mcenter[2]).value) # select galaxies within 0.25*virial radius
         bcg_arr = member_arr[bcg_idx] 
 
-        if len(bcg_arr) and len(member_arr):
-            mag_sort = bcg_arr[bcg_arr[:,3].argsort()]
-            bcg = mag_sort[0]
+        if len(bcg_arr) and len(member_arr): # check if cluster empty or if there are no galaxies within 0.25*virial radius
+
+            mag_sort = bcg_arr[bcg_arr[:,3].argsort()] # sort selected galaxies by abs mag (brightness)
+            bcg = mag_sort[0] # brightest cluster galaxy (bcg)
+
             if (abs(bcg[3]) > abs(mcenter[3])) and (tuple(bcg) != mcenter): # if bcg brighter than current center, replace it as center
                 center_shifted_candidates[tuple(bcg)] = member_arr
                 center_shifted_candidates[mcenter] = np.array([])
 
-    center_shifted_candidates = {k: v for k,v in center_shifted_candidates.items() if len(v)>=50}
+
+    center_shifted_candidates = {k: v for k,v in center_shifted_candidates.items() if len(v)>=richness}
     final_candidates = {}
-    
-    for fcenter, member_arr in center_shifted_candidates.items():
-        richness = find_richness(fcenter, member_arr, distance=0.25*virial_radius)
 
-        if richness < 8:  # Initialize the cluster only if richness >= 8 (richness is defined as the number of member galaxies within 0.25*virial radius)
-            final_candidates[fcenter] = np.array([]) 
+    # N(0.5) and galaxy overdensity
+    for odcenter, member_arr in center_shifted_candidates.items():
+
+        number_count = find_number_count(odcenter, member_arr, distance=0.5*u.Mpc/u.littleh) # find number count N(0.5)
+        N_mean, N_rms = center_overdensity(odcenter, galaxy_data, max_velocity) # find overdensity D
+        D = (odcenter[-1] - N_mean)/N_rms
+
+        # Initialize the cluster only if N(0.5) >= 8 and D >= overdensity
+        if D >= overdensity or number_count >= 8:
+            final_candidates[odcenter] = member_arr
         else:
-            final_candidates[fcenter + (richness,)] = member_arr
+            final_candidates[odcenter] = np.array([])
 
-    final_candidates = {k: v for k,v in final_candidates.items() if len(v)>=50}
+    final_candidates = {k: v for k,v in final_candidates.items() if len(v)>=richness}
 
-    if check_map:
-        count = 0
+    if check_map: # for checking cluster shapes, locations
         fig = plt.figure(figsize=(10,8))
         for k, v in final_candidates.items():
             plt.scatter(v[:,0], v[:,1], s=5)
             plt.scatter(k[0], k[1])
-            count += 1
-            if count % 5 == 0:
-                plt.axis([min(galaxy_data[:,0]), max(galaxy_data[:,0]), min(galaxy_data[:,1]), max(galaxy_data[:,1])])
-                plt.show()
-        # plt.axis([min(galaxy_data[:,0]), max(galaxy_data[:,0]), min(galaxy_data[:,1]), max(galaxy_data[:,1])])
-        # plt.show()
+            plt.axis([min(galaxy_data[:,0]), max(galaxy_data[:,0]), min(galaxy_data[:,1]), max(galaxy_data[:,1])])
+            plt.show()
 
     return final_candidates
 
 
 def three_sigma(cluster_center, cluster_members, n):
     '''
-    Performs the 3sigma interloper removal method and removes galaxies beyond 2 Mpc virial radius.
+    Performs the 3sigma interloper removal method and removes galaxies beyond 1.5 h^-1 Mpc radius.
 
     Parameters
     ----------
@@ -383,18 +406,28 @@ def three_sigma(cluster_center, cluster_members, n):
     Array of cleaned members with interlopers removed.
     '''
 
+    # add additional column to galaxy_data
+    N = cluster_members.shape
+    temp = np.zeros((N[0], N[1]+1))
+    temp[:,:-1] = cluster_members
+    cluster_members = temp
+    assert cluster_members.shape[1] == N[1]+1, 'Cluster member array is wrong shape.'
+
+    # initialize velocity column with redshift-velocity formula
     cluster_center = cluster_center[0]
+    cluster_members[:,-1] = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(cluster_center[2]))/(1+cluster_center[2])
+
     cluster_members = cluster_members[cluster_members[:,-1].argsort()] # sort by doppler velocity
-    assert min(cluster_members[:,-1]) == cluster_members[0,-1]
+    assert min(cluster_members[:,-1]) == cluster_members[0,-1], 'Not sorted by Doppler velocity'
 
     distance_tree = cKDTree(cluster_members[:,:2])
-    dist_idx = distance_tree.query_ball_point(cluster_center[:2], linear_to_angular_dist(2, cluster_center[2]).value)
+    dist_idx = distance_tree.query_ball_point(cluster_center[:2], linear_to_angular_dist(1.5*u.Mpc/u.littleh, cluster_center[2]).value) # select galaxies within 1.5 h^-1 Mpc
     cluster_members = cluster_members[dist_idx]
+    velocity_arr = cluster_members[:,-1]
     
     cleaned_members = []
-    velocity_arr = cluster_members[:,-1]
     bins = np.linspace(min(velocity_arr), max(velocity_arr), n)
-    digitized = np.digitize(cluster_members[:,-2], bins) # bin members into n velocity bins
+    digitized = np.digitize(cluster_members[:,-1], bins) # bin members into n velocity bins
 
     for i in range(1, len(bins)+1):
         bin_galaxies = cluster_members[np.where(digitized==i)] # galaxies in current bin
@@ -430,110 +463,113 @@ def three_sigma(cluster_center, cluster_members, n):
     return cleaned_members
 
 
-def create_candidate_df(d):
+def create_df(d, mode):
     '''Create two dataframes to store cluster information
 
     Parameters
     ----------
     d: dict (k:v -> bcg: cluster members)
+
+    mode: str
+    'before_interloper' is for data before interloper removal
+    'after_interloper' is for data after interloper removal
     
     Returns
     -------
     bcg_df: pd.Dataframe
-    df of cluster centers: ['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'gal_id', 'cluster_id']
+    df of cluster centers: ['ra', 'dec', 'redshift', 'brightness', 'LR', 'N(0.5)', 'total_N', 'gal_id', 'cluster_id']
 
-    member_galaxy_df: pd.Dataframe
-    df of member galaxies: ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'cluster_id']
+    member_df: pd.Dataframe
+    df of member galaxies: ['ra', 'dec', 'redshift', 'brightness', 'LR', 'gal_id', 'cluster_id']
     '''
 
-    columns = ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'LR', 'doppler_velocity', 'N(0.5)']
-    bcg_df = pd.DataFrame(columns=columns+['richness']).fillna(0)
-    member_galaxy_df = pd.DataFrame(columns=columns).fillna(0)
+    if mode == 'before_interloper':
+        columns = ['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'LR', 'N(0.5)']
 
-    for i, (k,v) in enumerate(d.items()):
-        bcg_df.loc[i, columns+['richness']] = k
-        bcg_df.loc[i, 'cluster_id'] = i
-        bcg_df.loc[i, 'total_N'] = len(v)
-        
-        N = v.shape
-        temp_v = np.zeros((N[0], N[1]+1))
-        temp_v[:,:-1] = v
-        temp_v[:,-1] = i
-        temp = pd.DataFrame(data=temp_v, columns=columns+['cluster_id'])
-        member_galaxy_df = member_galaxy_df.append(temp)
+    elif mode == 'after_interloper':
+        columns = ['ra', 'dec', 'redshift', 'brightness', 'LR', 'N(0.5)', 'total_N', 'gal_id', 'cluster_id']
+        member_columns = ['ra', 'dec', 'redshift', 'brightness', 'LR', 'gal_id', 'cluster_id', 'velocity']
     
-    bcg_df = bcg_df.sort_values('redshift')
-    bcg_df = bcg_df[['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']]
-    member_galaxy_df = member_galaxy_df[['ra', 'dec', 'redshift', 'brightness', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']]
-
-    return bcg_df, member_galaxy_df
-
-
-def create_cleaned_df(d):
-    columns = ['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']
-    member_columns = ['ra', 'dec', 'redshift', 'brightness', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']
+    else:
+        return Exception('No mode stated')
 
     bcg_df = pd.DataFrame(columns=columns).fillna(0)
-    member_df = pd.DataFrame(columns=member_columns).fillna(0)
+    member_df = pd.DataFrame(columns=columns).fillna(0)
 
     for i, (k,v) in enumerate(d.items()):
         bcg_df.loc[i, columns] = k
-        bcg_df.loc[i, 'cluster_id'] = i
+        bcg_df.loc[i, 'N(0.5)'] = find_number_count(k,v, distance=0.5*u.Mpc/u.littleh)
         bcg_df.loc[i, 'total_N'] = len(v)
-        bcg_df.loc[i, 'richness'] = find_richness(k, v, distance=0.5)
-
+        if mode == 'before_interloper':
+            bcg_df.loc[i, 'cluster_id'] = i
+        
         N = v.shape
-        temp_v = np.zeros((N[0], N[1]))
-        temp_v = v
-        temp = pd.DataFrame(data=temp_v, columns=member_columns)
-        member_df = member_df.append(temp)
+        if mode == 'before_interloper':
+            temp_v = np.zeros((N[0], N[1]+1))
+            temp_v[:,:-1] = v
+            temp_v[:,-1] = i
+            temp = pd.DataFrame(data=temp_v, columns=columns+['cluster_id'])
 
+        elif mode == 'after_interloper':
+            temp_v = np.zeros((N[0], N[1]))
+            temp_v = v
+            temp = pd.DataFrame(data=temp_v, columns=member_columns)
+
+        member_df = member_df.append(temp)
+        
+    
     bcg_df = bcg_df.sort_values('redshift')
-    bcg_df = bcg_df[['ra', 'dec', 'redshift', 'brightness', 'richness', 'total_N', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']]
-    member_df = member_df[['ra', 'dec', 'redshift', 'brightness', 'gal_id', 'LR', 'gal_id', 'doppler_velocity', 'cluster_id']]
+    bcg_df = bcg_df[['ra', 'dec', 'redshift', 'brightness', 'LR', 'N(0.5)', 'total_N', 'gal_id', 'cluster_id']]
+    member_df = member_df[['ra', 'dec', 'redshift', 'brightness', 'LR', 'gal_id', 'cluster_id']]
 
     return bcg_df, member_df
 
 
 if __name__ == "__main__":
 
-    # --- cluster search
+    # --- Select luminous galaxies from raw survey data
     # print('Selecting galaxy survey...')
     # conn = sqlite3.connect('galaxy_clusters.db')
     # df = pd.read_sql_query('''
     # SELECT *
     # FROM mag_lim
+    # WHERE redshift BETWEEN 0.5 AND 2.52
     # ORDER BY redshift
     # ''', conn)
 
     # df = df.loc[:, ['ra','dec','redshift','RMag','ID', 'LR']] # select relevant columns
-    # df['Doppler_vel'] = redshift_to_velocity(df['redshift'])
     # df = df.sort_values('redshift')
 
     # galaxy_arr = df.values
+    # print('No. of galaxies to search through: {no}'.format(no=len(galaxy_arr)))
     # galaxy_arr, luminous_arr = luminous_search(galaxy_arr, max_velocity=2000)
-    # np.savetxt('raw_galaxy2.csv', galaxy_arr, delimiter=',')
-    # np.savetxt('luminous_galaxy2.csv', luminous_arr, delimiter=',')
+    # np.savetxt('raw_galaxy.csv', galaxy_arr, delimiter=',')
+    # np.savetxt('luminous_galaxy.csv', luminous_arr, delimiter=',')
 
-    # galaxy_arr = np.loadtxt('raw_galaxy2.csv', delimiter=',')
-    # luminous_arr = np.loadtxt('luminous_galaxy2.csv', delimiter=',')
+    # -- FoF
+    richness = 40
+    D = 4
+    fname = 'derived_datasets\\R{r}_D{d}\\'.format(r=richness, d=D)
 
-    # galaxy_arr = galaxy_arr[(galaxy_arr[:,2] > 0.5) & (galaxy_arr[:,2] <= 2.05)]
-    # luminous_arr = luminous_arr[(luminous_arr[:,2] > 0.5) & (luminous_arr[:,2] <= 2.05)]
+    # galaxy_arr = np.loadtxt('raw_galaxy.csv', delimiter=',')
+    # luminous_arr = np.loadtxt('luminous_galaxy.csv', delimiter=',')
+
+    # galaxy_arr = galaxy_arr[(galaxy_arr[:,2] >= 0.5) & (galaxy_arr[:,2] <= 2.52)]
+    # luminous_arr = luminous_arr[(luminous_arr[:,2] >= 0.5) & (luminous_arr[:,2] <= 2.5)]
     # print('Number of galaxies: {galaxy}, Number of candidates: {luminous}'.format(galaxy=len(galaxy_arr), luminous=len(luminous_arr)))
 
-    # candidates = FoF(galaxy_arr, luminous_arr, max_velocity=2000, linking_length_factor=0.4, virial_radius=2, check_map=False)
+    # candidates = FoF(galaxy_arr, luminous_arr, max_velocity=2000, linking_length_factor=0.4, virial_radius=1.5*u.Mpc/u.littleh, richness=richness, overdensity=D, check_map=False)
     # print('{n} candidate clusters found.'.format(n=len(candidates)))
 
     # print('Exporting candidate clusters to csv...')
-    # candidate_df, candidate_member_df = create_candidate_df(candidates)
-    # fname = 'test2'
-    # candidate_df.to_csv(fname + '_candidate_bcg.csv', index=False)
-    # candidate_member_df.to_csv(fname + '_candidate_members.csv', index=False)
+    # candidate_df, candidate_member_df = create_df(candidates, mode='before_interloper')
+    # candidate_df.to_csv(fname+'candidate_bcg.csv', index=False)
+    # candidate_member_df.to_csv(fname+'candidate_members.csv', index=False)
+
 
     # -- interloper removal
-    # bcg_df = pd.read_csv('test2_candidate_bcg.csv')
-    # member_df = pd.read_csv('test2_candidate_members.csv')
+    # bcg_df = pd.read_csv(fname+'candidate_bcg.csv')
+    # member_df = pd.read_csv(fname+'candidate_members.csv')
 
     # bcg_arr = bcg_df.values
     # arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
@@ -546,48 +582,41 @@ if __name__ == "__main__":
 
     #     initial_size = len(clusters)
     #     cleaned_members = three_sigma(center, clusters, 10)
-    #     if len(cleaned_members) < 50:
-    #         cleaned_members = np.array([])
-    #     if g % 500 == 0:
+    #     if len(cleaned_members) < richness:
+    #         cleaned_clusters[tuple(center[0])] = np.array([])
+    #     else:
+    #         cleaned_clusters[tuple(center[0])] = cleaned_members
+    #     if g % 100 == 0:
     #         print('Interlopers removed from cluster {g}: {size_change}'.format(g=g, size_change=abs(len(cleaned_members)-initial_size)))
 
-    #     cleaned_clusters[tuple(center[0])] = cleaned_members
-    
-    # cleaned_clusters = {k:v for k,v in cleaned_clusters.items() if len(v) >= 50}
-    # print('Number of clusters: {n}'.format(n=len(cleaned_clusters)))
+    # cleaned_clusters = {k:v for k,v in cleaned_clusters.items() if len(v) >= richness}
+    # print('Number of clusters: {n} returned'.format(n=len(cleaned_clusters)))
 
     # print('Exporting cleaned candidate clusters to csv...')
-    # cleaned_df, cleaned_member_df = create_cleaned_df(cleaned_clusters)
-
-    # cleaned_df.to_csv('cleaned_bcg.csv', index=False)
-    # cleaned_member_df.to_csv('cleaned_members.csv', index=False)
-
-    # add_to_db(cleaned_df, '0-3_interloper_removed_bcg')
-    # add_to_db(cleaned_member_df, '0-3_interloper_removed_members')
+    # cleaned_df, cleaned_member_df = create_df(cleaned_clusters, mode='after_interloper')
 
 
     # -- extract required sample
-    # bcg_df = pd.read_csv('cleaned_bcg.csv')
-    # member_df = pd.read_csv('cleaned_members.csv')
-    # print(len(bcg_df), len(member_df))
-    # bcg_id = bcg_df['cluster_id']
-    # member_df = member_df.loc[member_df['cluster_id'].isin(bcg_id)]
-    # member_id = np.unique(member_df['cluster_id'])
-    # bcg_df = bcg_df.loc[bcg_df['cluster_id'].isin(member_id)]
-    # assert len(bcg_df) == len(np.unique(member_df['cluster_id']))
+    # print(len(cleaned_df), len(cleaned_member_df))
 
-    # bcg_df = bcg_df[(bcg_df['richness'] >= 8) & (bcg_df['redshift'] <= 2.05) & (bcg_df['redshift'] >= 0.5)]
-    # bcg_id = bcg_df['cluster_id']
-    # member_df = member_df.loc[member_df['cluster_id'].isin(bcg_id)]
+    # bcg_id = cleaned_df['cluster_id']
+    # cleaned_member_df = cleaned_member_df.loc[cleaned_member_df['cluster_id'].isin(bcg_id)]
+    # member_id = np.unique(cleaned_member_df['cluster_id'])
+    # cleaned_df = cleaned_df.loc[cleaned_df['cluster_id'].isin(member_id)]
+    # assert len(cleaned_df) == len(np.unique(cleaned_member_df['cluster_id']))
 
-    # assert len(bcg_df) == len(np.unique(member_df['cluster_id']))
-    # print(len(bcg_df), len(member_df))
+    # cleaned_df = cleaned_df[(cleaned_df['N(0.5)'] >= 8) & (cleaned_df['redshift'] >= 0.5) & (cleaned_df['redshift'] <= 2.5)]
+    # bcg_id = cleaned_df['cluster_id']
+    # cleaned_member_df = cleaned_member_df.loc[cleaned_member_df['cluster_id'].isin(bcg_id)]
 
-    # bcg_df.to_csv('filtered_bcg.csv', index=False)
-    # member_df.to_csv('filtered_members.csv', index=False)
+    # assert len(cleaned_df) == len(np.unique(cleaned_member_df['cluster_id']))
+    # print(len(cleaned_df), len(cleaned_member_df))
 
+    # cleaned_df.to_csv(fname+'filtered_bcg.csv', index=False)
+    # cleaned_member_df.to_csv(fname+'filtered_members.csv', index=False)
+    
 
-    # -- calculate masses
+    # -- calculate and compare masses
     def test_masses(bcg_file, member_file, estimator, fname):
         bcg_df = pd.read_csv(bcg_file)
         member_df = pd.read_csv(member_file)
@@ -605,9 +634,9 @@ if __name__ == "__main__":
                 mass = projected_mass_estimator(center, cluster)
             masses[i] = mass.value
         
-        np.savetxt('{f}_{m}_masses.txt'.format(f=fname, m=estimator), masses)
+        np.savetxt(fname+'test_{m}_masses.txt'.format(f=fname, m=estimator), masses)
 
-        # masses = np.loadtxt('{f}_{m}_masses.txt'.format(f=fname, m=estimator))
+        # masses = np.loadtxt(fname+'{f}_{m}_masses.txt'.format(f=fname, m=estimator))
 
         # i, = np.where(bcg_arr[:,2] < 2.50)
         # bcg_arr = bcg_arr[i,:]
@@ -634,11 +663,11 @@ if __name__ == "__main__":
         # ax.plot(x,a*x+b,'k--',alpha=0.75)
         # print(r)
 
-        ax.set_xlim(0.5,2.05)
+        ax.set_xlim(0.5,2.5)
         # ax.set_ylim(0,6e15)
         plt.show()
 
-    # test_masses('filtered_bcg.csv', 'filtered_members.csv', estimator='virial', fname='test')
+    # test_masses(fname+'filtered_bcg.csv', fname+'filtered_members.csv', estimator='virial', fname=fname)
 
     def compare_masses(projected_masses, virial_masses):
         projected = np.loadtxt(projected_masses)
@@ -667,35 +696,41 @@ if __name__ == "__main__":
         
         plt.show()
 
-    # compare_masses('test_projected_masses.txt', 'test_virial_masses.txt')
+    # compare_masses(fname+'test_projected_masses.txt', fname+'test_virial_masses.txt')
+
 
     # -- plotting clusters for manual checking
-    # import logging
-    # logging.basicConfig(level=logging.DEBUG, format="%(asctime)s -  %(levelname)s -  %(message)s")
-    
-    # bcg_df = pd.read_csv('filtered_bcg.csv')
-    # member_df = pd.read_csv('filtered_members.csv')
-    # bcg_arr = bcg_df.sort_values('redshift').values
-    # arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
+    def check_plots(bcg_df, member_df):
+        import logging
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s -  %(levelname)s -  %(message)s")
+        logging.getLogger('matplotlib.font_manager').disabled = True
 
-    # bins = np.linspace(0.5,2.53,68) # bins of 0.03 width
-    # bins = np.arange(0.5,2.53,0.00666)
-    # digitized = np.digitize(bcg_arr[:,2], bins)
+        
+        bcg_df = pd.read_csv(bcg_df)
+        member_df = pd.read_csv(member_df)
+        bcg_arr = bcg_df.sort_values('redshift').values
+        arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
 
-    # for i in range(1,len(bins)):
-    #     binned_data = bcg_arr[np.where(digitized==i)]
-    #     logging.debug('Number of clusters in bin {i}: {length}'.format(i=i,length=len(binned_data)))
+        bins = np.linspace(0.5,2.03,68) # bins of 0.03 width
+        bins = np.arange(0.5,2.03,0.00666)
+        digitized = np.digitize(bcg_arr[:,2], bins)
 
-    #     if len(binned_data): # plot clusters for checking
-    #         fig = plt.figure(figsize=(10,8))
-            # plt.hist2d(x=arr[:,0], y=arr[:,1], bins=(100,80), cmap=plt.cm.Reds)
-    #         for center in binned_data:
-    #             cluster_id = center[-1]
-    #             cluster = arr[arr[:,-1]==cluster_id]
-    #             plt.scatter(cluster[:,0], cluster[:,1], s=5)
-    #             plt.scatter(center[0], center[1])
-    #             plt.axis([min(arr[:,0]), max(arr[:,0]), min(arr[:,1]), max(arr[:,1])])
-    #             logging.debug('Plotting cluster: {cluster}'.format(cluster=center[0:2]))
+        for i in range(1,len(bins)):
+            binned_data = bcg_arr[np.where(digitized==i)]
+            logging.debug('Number of clusters in bin {i}: {length}'.format(i=i,length=len(binned_data)))
 
-    #         logging.debug('Plotting bin {i}. Clusters with binned redshift {redshift}'.format(i=i, redshift=bins[i]))
-    #         plt.show()
+            if len(binned_data): # plot clusters for checking
+                fig = plt.figure(figsize=(10,8))
+                # plt.hist2d(x=arr[:,0], y=arr[:,1], bins=(100,80), cmap=plt.cm.Reds)
+                for center in binned_data:
+                    cluster_id = center[-1]
+                    cluster = arr[arr[:,-1]==cluster_id]
+                    plt.scatter(cluster[:,0], cluster[:,1], s=5)
+                    plt.scatter(center[0], center[1])
+                    plt.axis([min(arr[:,0]), max(arr[:,0]), min(arr[:,1]), max(arr[:,1])])
+                    logging.debug('Plotting cluster: {cluster}'.format(cluster=center[0:2]))
+
+                logging.debug('Plotting bin {i}. Clusters with binned redshift {redshift}'.format(i=i, redshift=bins[i]))
+                plt.show()
+
+    # check_plots('derived_datasets\\R25_D4\\candidate_bcg.csv', 'derived_datasets\\R25_D4\\candidate_members.csv')

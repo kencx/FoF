@@ -1,21 +1,41 @@
-
 CLUSTER FINDING AND MASS ESTIMATION
-1. Remove galaxies from edges, corners and masked areas (DONE)
-2. Correct for Malmquist bias - Cut data at peak (DONE)
-3. Obtain cluster sample for 0.5 < z < 2.5 (DONE)
-    3.1 Check through sample and filter them 
-    3.2 Apply catalogue matching, richness accuracy test and cluster mass to compare between cluster sample and catalogues (DONE)
-    3.3 Interloper removal (Add to DB but do not replace!) (DONE)
-4. Obtain mass estimates (DONE)
-    5.1 Perform mass correction (DONE but weird results)
-    5.2. Compare projected mass and corrected virial mass (DONE)
+DONE:
+1. Removed galaxies near large masked areas and edge regions
+2. Correct for Malmquist bias - Cut data at peak of abs mag
+3. Obtain cluster sample for 0.5 < z < 2.5
+    3.1 Velocity selection with v <= 2000km/s
+    3.2 Interloper removal (3sigma cutting)
+4. Do a sensitivity test for R and D by catalog matching and richness tests
+    4.1 Deep field catalog, Cosmic web catalog, ultra-deep catalog
+5. Obtain mass estimates
+    5.1 Compare projected and virial masses
+
+
+
+TO DO: (not in order of importance)
+1. Check through sample and filter cluster near edges
+3. Select 4 random clusters, perform some dynamical analysis to check results
+    3.1 Plot their velocity dispersion against radius dependence
+    3.2 Plot their galaxy locations
+4. Perform bootstrapping to calculate uncertainties
+    4.1 Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
 5. Obtain parameters for all clusters and add to DB
     1. Cluster Mass before interloper removal 
     2. Cluster Mass after interloper removal
     3. Virial radius
     4. Cluster velocity dispersion
-    5. Others?
-6. Plotting
+    5. Lumonosity of 4 brightest members
+6. Make the following decisions to FoF algorithm:
+    6.1 Decide whether to include convergent estimation of r200 in interloper removal (is r200 really reliable?)
+7. How to determine radii of clusters?
+  7.1 Using r200?
+  7.2 Plot clusters and look at the centralised region
+  7.3 Largest projected separation between center and member galaxy
+
+
+SEMI IMPORTANT
+1. Apply mass weighting to virial_mass_estimator
+2. Compare sample masses with catalogue masses
 
 
 ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE
@@ -33,25 +53,8 @@ ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE
     1. Plot and analyze global cluster mass function (how?). 
     2. Can relate to cosmological parameters?
 11. Examine differences of clusters with different N or R
+12. Compare sample with SDSS sample
 
-
-
-SEMI IMPORTANT
-1. Apply mass weighting to virial_mass_estimator
-2. Compare sample masses with catalogue masses
-3. Calculate uncertainties (astropy bootstrap method)
-    1. Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
-
-
-4. Look into standardizing units of little h (Croton, 2013)
-    1. Astropy littleh equivalence
-
-
-
-
-OPTIONAL
-1. Do Voronoi tessellation?
-2. Join with SDSS masses and compare
 
 SELECTION CRITERIA FOR ABELL CATALOGUE
 A cluster of galaxies listed in the Abell Catalogue. 

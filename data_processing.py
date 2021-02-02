@@ -61,7 +61,7 @@ def split_df_into_groups(df, column, n):
 
 # cosmic_web_df = fits_to_df('J_ApJ_837_16_table1.dat.gz.fits')
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
-# gal_weight_df = fits_to_df('J_ApJS_246_2_galwcls.dat.gz.fits')
+# ultra_deep_df = fits_to_df('J_MNRAS_423_2436_table1.dat.fits')
 
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
@@ -93,9 +93,9 @@ def drop_null(df):
 # deep_field_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'zs', 'mag', 'Ngal', 'R', 'Ltot']
 
 
-# -- galweight
-# gal_weight_df = gal_weight_df[['ClID', 'RAdeg', 'DEdeg', 'z', 'RV', 'r200', 'N200', 'sig200', 'M200', 'Rs', 'Ms', 'conc']]
-# gal_weight_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'RV', 'r200', 'N200', 'sig200', 'M200', 'Rs', 'Ms', 'conc']
+# -- ultra_deep
+# ultra_deep_df.drop(['e_z', 'Area'], axis=1, inplace=True)
+# ultra_deep_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'R', 'number_density', 'L4']
 
 
 # --- Add datasets to database, form cleaned csv file
@@ -130,8 +130,7 @@ def add_data(df, name):
 # add_data(cosmic_web_df, 'cosmic_web_bcg')
 # add_data(cosmic_web_members_df, 'cosmic_web_members')
 # add_data(deep_field_df, 'deep_field')
-# add_data(gal_weight_df, 'gal_weight')
-
+# add_data(ultra_deep_df, 'ultra_deep')
 
 # --- database management
 

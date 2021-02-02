@@ -7,22 +7,31 @@ from matplotlib import cm
 from scipy.stats import linregress
 from scipy import optimize
 
+from data_processing import split_df_into_groups
+
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif', size=14)
 
-# import data from DB
-
-# RA against DEC
 
 
-
-# --------------------------- Magnitude Histogram ----------------------------
+# --------------------------- RA against DEC ------------------------------
 # df = pd.read_csv('datasets\\cosmos2015_dataset.csv')
 # columns = ['ra', 'dec', 'ID', 'zphot', 'redshift', 'z_lower', 'z_upper+', 'RMag', 'Class', 'log_Stellar_Mass', 'log_SFR', 'LR'] # renaming columns
 # df.columns = columns
-
 # df = df[(df['redshift'] <= 2.5)] # select for redshift 0<z<2
-# mag_lim_df = df[df['RMag'] >= -50]
+# df = df[df['RMag'] >= -50]
+
+# fig, ax = plt.subplots(figsize=(10,8))
+# h = ax.hist2d(df['ra'], df['dec'], bins=(100,80))
+# cbar = fig.colorbar(h[3], ax=ax)
+
+# ax.set_xlabel('Right Ascension (deg)')
+# ax.set_ylabel('Declination (deg)')
+# cbar.ax.set_ylabel('Counts')
+# plt.show()
+
+
+# --------------------------- Magnitude Histogram ----------------------------
 
 # fig, ax = plt.subplots(figsize=(12,8), sharey=True)
 # main_ax = plt.subplot2grid((3,3), (0,0), rowspan=3, colspan=2, fig=fig)
@@ -46,22 +55,52 @@ plt.rc('font', family='serif', size=14)
 # plt.show()
 
 
-
-# Redshift distribution
-
 # No. of galaxies (N) distribution
+# fig, ax = plt.subplots(figsize=(10,8))
+# ax.hist(mag_lim_df['redshift'], bins=30, histtype='step')
+# ax.set_xlabel('Redshift')
+# ax.set_ylabel('Counts (x$\mathrm{10^3}$)')
+# ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, pos: '%.0f' % (y * 1e-3)))
+# plt.show()
 
 
+# Magnitude comparison between redshifts
+# df_first_bin = df[(df['redshift'] <= 1.0) & (df['redshift'] >= 0.5)]
+# df_second_bin = df[(df['redshift'] <= 1.5) & (df['redshift'] > 1.0)]
+# df_third_bin = df[(df['redshift'] <= 2.0) & (df['redshift'] >1.5)]
+# df_fourth_bin = df[(df['redshift'] <= 2.5) & (df['redshift'] > 2.0)]
+# df_fifth_bin = df[(df['redshift'] <= 3.0) & (df['redshift'] > 2.5)]
+
+# fig, ax = plt.subplots(figsize=(10,8))
+# n, bins, patches = ax.hist(df_first_bin['RMag'], bins=30, alpha=0.4, label='$0.5 \leq z \leq 1$')
+# ax.hist(df_second_bin['RMag'], bins=30, alpha=0.4, label='$1 < z \leq 1.5$')
+# ax.hist(df_third_bin['RMag'], bins=30, alpha=0.4, label='$1.5 < z \leq 2$')
+# ax.hist(df_fourth_bin['RMag'], bins=30, alpha=0.4, label='$2 < z \leq 2.5$')
+# ax.hist(df_fifth_bin['RMag'], bins=30, alpha=0.4, label='$2.5 < z \leq 3$')
+# ax.axvline(-19.5, color='k', linestyle='--')
+# ax.yaxis.set_major_formatter(ticker.FuncFormatter(
+#     lambda y, pos: '%.0f' % (y * 1e-3)))
+# ax.set_ylabel('Counts (x$10^3$)')
+# ax.set_xlabel('R Absolute Magnitude (mag)')
+# ax.set_xlim(-28, -8)
+# plt.legend(frameon=False)
+# plt.show()
 
 
 # ---------------------- Mass against redshift -----------------------------
-# bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv')
-# bcg_arr = bcg_df.sort_values('cluster_id').values
-# masses = np.loadtxt('derived_datasets\\test_virial_masses.txt')
+fname = 'derived_datasets\\R25_D4\\'
+bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
+bcg_arr = bcg_df.sort_values('cluster_id').values
 
-# k, = np.where(bcg_arr[:,2] <= 2.5)
-# bcg_arr = bcg_arr[k,:]
+masses = np.loadtxt(fname+'test_virial_masses.txt')
+
+# k, = np.where(bcg_arr1[:,2] <= 2.0)
+# bcg_arr1 = bcg_arr1[k,:]
 # masses = masses[k]
+
+# k, = np.where((bcg_arr2[:,2] >= 2.0) & (bcg_arr2[:,2]<=2.5))
+# bcg_arr2 = bcg_arr2[k,:]
+# next_masses = next_masses[k]
 
 # bins = np.arange(0.5,2.0+0.2,0.2)
 # digitized = np.digitize(bcg_arr[:,2], bins, right=True)
@@ -81,13 +120,11 @@ plt.rc('font', family='serif', size=14)
 # assert len(mass_curve) == len(bins)
 
 # fig, ax = plt.subplots(figsize=(12,8))
-# p = ax.scatter(bcg_arr[:,2], np.log10(masses), s=8, alpha=0.75, label='Cluster Mass')
-# ax.scatter(bcg_arr[:,2], np.log10(corrected_mass), s=8, alpha=0.75, label='Corrected Mass')
+# p = ax.scatter(bcg_arr[:,2], np.log10(masses), s=8, color='tab:blue', alpha=0.75, label='Cluster Mass')
+# p = ax.scatter(bcg_arr2[:,2], np.log10(next_masses), s=8, color='tab:blue', alpha=0.75, label='Cluster Mass')
 # ax.plot(bins, np.log10(mass_curve), 'r--', label='Median log($\mathrm{M/M_\odot}$)')
-# cbar = fig.colorbar(p)
 
-
-# ax.set_title('Mass against redshift')
+# ax.set_title('Estimated Mass against Redshift')
 # ax.set_xlabel('Redshift')
 # ax.set_ylabel('log($\mathrm{M/M_\odot}$)')
 
@@ -96,20 +133,17 @@ plt.rc('font', family='serif', size=14)
 # ax.ticklabel_format(style='sci', axis='y')
 # ax.yaxis.major.formatter._useMathText = True
 
-# ax.set_xlim(0.5,2.0)
-# ax.set_ylim(14.5,15.8)
+# ax.set_xlim(0.5,2.5)
+# ax.set_ylim()
 # ax.legend(frameon=False)
 # plt.show()
 
 
 
 # ------------------ Virial mass against projected mass --------------------------------
-# projected = np.loadtxt('derived_datasets\\filtered_projected_masses.txt')
-# virial = np.loadtxt('derived_datasets\\filtered_virial_masses.txt')
-# virial = np.loadtxt('corrected_masses.txt')
+# projected = np.loadtxt('derived_datasets\\test_projected_masses.txt')
+# virial = np.loadtxt('derived_datasets\\test_virial_masses.txt')
 
-# projected = projected[projected < 1e17]
-# virial = virial[virial < 1e17]
 
 # fig, ax = plt.subplots(figsize=(12,8))
 # ax.scatter(x=np.log10(virial), y=np.log10(projected), s=10, alpha=0.75)
@@ -125,15 +159,16 @@ plt.rc('font', family='serif', size=14)
 
 # ax.minorticks_on()
 # ax.tick_params(which='major', direction='inout')
-# ax.ticklabel_format(style='sci', axis='y')
+# # ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, pos: '%.0f' % (y * 1e1)))
+# # ax.ticklabel_format(style='sci')
 
 # ax.set_xlim(lims)
 # ax.set_ylim(lims)
 # ax.set_xlabel('Virial mass log($\mathrm{M/M_\odot}$)')
 # ax.set_ylabel('Projected mass log($\mathrm{M/M_\odot}$)')
-# ax.set_yscale('log')
-# ax.set_xscale('log')
-# ax.legend()
+# # ax.set_yscale('log')
+# # ax.set_xscale('log')
+# ax.legend(frameon=False)
 
 # plt.show()
 
@@ -141,8 +176,7 @@ plt.rc('font', family='serif', size=14)
 # --------- velocity against radius -----------------
 # from FoF_algorithm import linear_to_angular_dist
 # from mass_estimator import redshift_to_velocity
-from data_processing import split_df_into_groups
-# from astropy.cosmology import WMAP5 as cosmo
+# from astropy.cosmology import LambdaCDM
 # from astropy.coordinates import SkyCoord
 # import astropy.units as u
 
@@ -209,27 +243,43 @@ from data_processing import split_df_into_groups
 
 # ------ richness against mass
 # bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv').sort_values('cluster_id')
-# member_df = pd.read_csv('derived_datasets\\filtered_members.csv')
-# virial = np.loadtxt('derived_datasets\\test_virial_masses.txt')
+member_df = pd.read_csv(fname+'filtered_members.csv')
+virial = np.loadtxt(fname+'test_virial_masses.txt')
 
 # bcg_df = bcg_df[bcg_df['redshift'] <= 2.5]
 # k, = np.where(bcg_df['redshift'] <= 2.5)
-# # virial = virial[k]
+# virial = virial[k]
 
-# bcg_arr = bcg_df.values
-# arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
-# total_lum = np.zeros(len(group_n))
+bcg_arr = bcg_df.values
+arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
+total_lum = np.zeros(len(group_n))
 
-# for i, g in enumerate(group_n):
-#     center = bcg_arr[bcg_arr[:,-1]==g]
-#     cluster_members = arr[arr[:,-1]==g]
-#     lum2 = cluster_members[cluster_members[:,3].argsort()][2,3]
-#     total_lum[i] = lum2
+for i, g in enumerate(group_n):
+    center = bcg_arr[bcg_arr[:,-1]==g]
+    cluster_members = arr[arr[:,-1]==g]
+    lum2 = cluster_members[cluster_members[:,3].argsort()][2,3]
+    total_lum[i] = lum2
 
-# X = np.linspace(min(bcg_df['total_N']),max(bcg_df['total_N']),100)
-# m,c,r,_,_ = linregress(bcg_df['total_N'], virial)
+X = np.linspace(min(bcg_df['total_N']),max(bcg_df['total_N']),100)
+# m1,c1,r1,_,_ = linregress(bcg_df['total_N'], (virial))
+m2,c2,r2,_,_ = linregress(bcg_df['total_N'], total_lum)
 
-# fig, ax = plt.subplots(figsize=(12,8))
-# ax.scatter(bcg_df['total_N'], virial, s=8)
-# ax.plot(X, m*X+c, '--')
-# plt.show()
+fig, ax = plt.subplots(figsize=(12,8))
+
+mass_ax = plt.subplot2grid((1,2), (0,0), fig=fig)
+lum_ax = plt.subplot2grid((1,2), (0,1), fig=fig)
+
+# mass_ax.scatter(bcg_df['total_N'], (virial), s=8, alpha=0.5)
+# mass_ax.plot(X, m1*X+c1, 'r--')
+
+# mass_ax.set_xlabel('Richness R')
+# mass_ax.set_ylabel('Virial Mass log($\mathrm{M/M_\odot}$)')
+
+lum_ax.scatter(bcg_df['total_N'], total_lum, s=8, alpha=0.5)
+lum_ax.plot(X, m2*X+c2, 'r--')
+
+lum_ax.set_xlabel('Richness R')
+lum_ax.set_ylabel('Absolute Magnitude (mag)')
+
+plt.subplots_adjust(wspace= 0.3)
+plt.show()

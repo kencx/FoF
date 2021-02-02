@@ -8,9 +8,10 @@ from scipy.integrate import quad_vec
 from astropy import units as u
 import astropy.constants as const
 from astropy.coordinates import SkyCoord
-from astropy.cosmology import WMAP5 as cosmo
+from astropy.cosmology import LambdaCDM
 from astropy.modeling.models import NFW
 
+cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
 def redshift_to_velocity(z):
     '''
@@ -28,8 +29,8 @@ def redshift_to_velocity(z):
     '''
 
     c = const.c.to('km/s')
-    v = c*((1+z)**2 - 1)/((1+z)**2 + 1)
-    # v = c*z
+    # v = c*((1+z)**2 - 1)/((1+z)**2 + 1) # relativistic doppler formula
+    v = c*z
     return v
 
 # calculate velocity dispersion for an array of velocities
@@ -72,14 +73,14 @@ def virial_mass_estimator(cluster_members): # INCLUDE MASS WEIGHTING
     photoz_arr = cluster_members[:,2]
 
     average_redshift = np.mean(photoz_arr)
-    cluster_vel = (redshift_to_velocity(photoz_arr) - redshift_to_velocity(average_redshift))# /(1+average_redshift)
+    cluster_vel = (redshift_to_velocity(photoz_arr) - redshift_to_velocity(average_redshift))/(1+average_redshift)
     cluster_vel_disp = velocity_dispersion(cluster_vel, cluster_size)
 
     # galaxy separations
     c = SkyCoord(ra=cluster_members[:,0]*u.degree, dec=cluster_members[:,1]*u.degree) # array of coordinates
     
-    pairs_idx = np.asarray(list((i,j) for ((i,_), (j,_)) in itertools.combinations(enumerate(c), 2))) # index of gals in combinations
-    photoz_pairs = np.take(photoz_arr, pairs_idx) # photoz values of gals from the indices
+    pairs_idx = np.asarray(list((i,j) for ((i,_), (j,_)) in itertools.combinations(enumerate(c), 2))) # index of galaxies in combinations
+    photoz_pairs = np.take(photoz_arr, pairs_idx) # photoz values of galaxies from the indices
     d_A = cosmo.angular_diameter_distance(z=photoz_pairs[:,0]) # angular diameter distance
 
     pairs = c[pairs_idx]
@@ -99,7 +100,7 @@ def projected_mass_estimator(cluster_center, cluster_members):
     N = len(cluster_members)
 
     average_redshift = np.mean(cluster_members[:,2])
-    cluster_velocity = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(average_redshift)) #/(1+average_redshift) # in km/s
+    cluster_velocity = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(average_redshift))/(1+average_redshift) # in km/s
 
     c = SkyCoord(ra=cluster_members[:,0]*u.degree, dec=cluster_members[:,1]*u.degree)
     centroid = SkyCoord(ra=np.mean(cluster_members[:,0])*u.degree, dec=np.mean(cluster_members[:,1])*u.degree)
@@ -146,16 +147,19 @@ def mass_correction(mass, r_200, bcg_arr):
 
 if __name__ == "__main__":
     pass
-    # bcg_df = pd.read_csv('derived_datasets\\filtered_bcg.csv')
+    # bcg_df = pd.read_csv('filtered_bcg.csv')
 
     # bcg_arr = bcg_df.sort_values('cluster_id').values
-    # masses = np.loadtxt('derived_datasets\\filtered_virial_masses.txt')
+    # masses = np.loadtxt('test_virial_masses.txt')
 
     # corrected_mass = mass_correction(masses, 2, bcg_arr).value
     # np.savetxt('corrected_masses.txt', corrected_mass)
 
     # plot mass against corrected mass difference
     # plt.figure(figsize=(12,8))
+    # plt.scatter(bcg_df['redshift'], np.log10(corrected_mass), s=8, color='k', alpha=0.5)
+    # plt.scatter(bcg_df['redshift'], np.log10(masses), s=8, color='red', alpha=0.5)
+    # plt.axis()
     # plt.scatter(masses, (masses-corrected_mass)/masses, s=8, alpha=0.75)
     # plt.show()
 
