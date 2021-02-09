@@ -1,0 +1,60 @@
+Velocity selection
+------------------
+
+R 12 D 4
+Mass range: 14.6-15.6
+Mass-redshift: Moderate-low scatter, increasing trend
+Mag-R: R2 = 0.450, Vertical bars at every value at low richness (strange) with very slight increasing trend
+Catalog matching: 241/532 - 45.3%; 130/209 - 62.2%; 100/155 - 64.5%
+Richness matching: good mix near y=x with more catalog overestimation; good mix near y=x; sample is overestimated
+
+R 25 D 4 (FAIL)
+Mass range: 15.1-15.7
+Mass-redshift: Moderate scatter with increasing trend
+Mag-R: very slight increasing trend, R2 = 0.421, obvious vertical cutoff at 25
+
+R 40 D 4 (FAIL)
+Mass range: 15.1-15.7
+Mass-redshift: Higher scatter and sparseness at low z than R25 with increasing trend.
+Mag-R: R2 = 0.286, More obvious cutoff at 40
+
+R 50 D 4 (FAIL)
+Mass range: 15.1-15.7
+Mass-redshift: Very sparse with increasing trend
+Mag-R: R2 = 0.25, obvious cutoff at 50
+
+
+Redshift Binning
+----------------
+
+z-factor = 0.02
+R 25 D 4
+Mass range: 15.7-16.5
+Mass-redshift: Increasing trend with increasing scatter. Moderate overall scatter, more compared to z-factor=0.04.
+Mag-R: R2 = 0.534, obvious cutoff at R=25, increasing trend
+
+ultra_deep, cosmic_web, deep_field
+Catalog matching: 64/140 - 45.7%; 33/59 - 55.9%; 50/77 - 64.9%
+Richness matching: Good mix near y=x; good trend; sample is overestimated
+
+R 40 D 4 (FAIL)
+Mass range: 15.8-16.5
+Mass-redshift: High scatter with increasing trend
+Mag-R: R2 = 0.426, obvious cutoff at R=40, slight increasing trend
+
+z-factor = 0.04 (FAIL)
+R 40 D 4 
+Mass range: 16.2-17.0
+Mass-redshift: Increasing trend follow but a decrease after z=2.25. Low scatter compared to velocity selection
+Mag-R: R2 = 0.567, no cutoffs at lower R
+Catalog matching: 29/69 - 42.0%; 13/23 - 56.5%; 7/16 - 43.75%
+Richness matching: sample more overestimated; sample is a little overestimated; sample is overestimated
+
+
+comparing redshift 0.02 and 0.04:
+    redshift 0.02 seems to have better richness match, while catalog matching is about the same. however, redshift 0.02 has large scatter for the richness-brightness relationship.
+    redshift 0.04 has less scatter for brightness-richness dependence. both are for R40 D4. try R25 for 0.02?
+    redshift 0.02 also has lower mass by almost 1 magnitude than 0.04
+    redshift 0.02 richness-mag graph seems to show a lot of clusters are at richness 40, indicating possible hard cut
+
+comparing R40 and R25 with D2 and D4:

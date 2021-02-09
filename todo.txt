@@ -14,9 +14,9 @@ DONE:
 
 TO DO: (not in order of importance)
 1. Check through sample and filter cluster near edges
-3. Select 4 random clusters, perform some dynamical analysis to check results
-    3.1 Plot their velocity dispersion against radius dependence
-    3.2 Plot their galaxy locations
+2. Select 4 random clusters, perform some dynamical analysis to check results
+    2.1 Plot their velocity dispersion against radius dependence
+    2.2 Plot their galaxy locations
 4. Perform bootstrapping to calculate uncertainties
     4.1 Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
 5. Obtain parameters for all clusters and add to DB
@@ -61,3 +61,10 @@ A cluster of galaxies listed in the Abell Catalogue.
 To appear in the catalogue, a cluster must satisfy selection criteria which include containing more than 50 galaxies and having a dense concentration (richness). 
 The clusters are classified as regular (R) or irregular (I) in appearance, ranked in increasing richness from 1 to 5, and increasing distance from 1 to 6. 
 The approximate frequency of Abell clusters is one per 2.4 × 105 cubic megaparsecs.
+
+
+
+Feedback from presentation
+- From Dr Cindy: How did you determine the d and z bins to search around?
+- What is the ratio of these factors
+- little h value can't use 0.7 for all redshifts, as it changes

@@ -5,74 +5,33 @@ import sqlite3
 
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.cosmology import WMAP5 as cosmo
+from astropy.cosmology import LambdaCDM
 import astropy.constants as const
 from astropy.coordinates import Distance
 
 from FoF_algorithm import linear_to_angular_dist
-from mass_estimator import virial_mass_estimator
+# from mass_estimator import virial_mass_estimator
 
-# Query databases
-
-
-conn = sqlite3.connect('galaxy_clusters.db')
-
-cosmic_web_bcg = pd.read_sql_query('''
-    SELECT ra, dec, redshift, Ngal, cluster_id
-    FROM cosmic_web_bcg
-    WHERE Ngal >= 20
-    ORDER BY redshift
-    ''', conn)
-cosmic_web_bcg_arr = cosmic_web_bcg.values
-
-cosmic_web_mem = pd.read_sql_query('''
-    SELECT ra, dec, redshift, Ngal, cluster_id
-    FROM cosmic_web_members
-    WHERE Ngal >= 20
-    ORDER BY redshift
-    ''', conn)
-cosmic_web_mem_arr = cosmic_web_mem.values
-
-gal_weight_bcg = pd.read_sql_query('''
-    SELECT *
-    FROM gal_weight
-    WHERE N200 >= 20
-    ORDER BY redshift
-    ''', conn)
-gal_weight_arr = gal_weight_bcg.values
-
-conn.close()
-
-# ids = np.unique(cosmic_web_bcg_arr[:,-1])
-# masses = np.zeros(len(ids))
-
-# for idx, i in enumerate(ids):
-#     center = cosmic_web_bcg_arr[cosmic_web_bcg_arr[:,-1]==i]
-#     cluster = cosmic_web_mem_arr[cosmic_web_mem_arr[:,-1]==i]
-#     mass, _, _ = virial_mass_estimator(cluster)
-#     masses[idx] = mass.value
+cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
 
-# bins = np.arange(0.19, 1.2+0.2, 0.2)
-# digitized = np.digitize(cosmic_web_bcg_arr[:,2], bins, right=True)
-# mass_curve = []
+R = 25
+D = 4
+df = pd.read_csv('derived_datasets\\COSMOS_galaxy_data.csv')
+print('Number of galaxies: {len}'.format(len=len(df)))
 
-# for i in range(1,len(bins)+1):
-#     bin_mass = masses[np.where(digitized==i)]
+luminous_df = pd.read_csv('derived_datasets\\luminous_galaxy_redshift0.02.csv')
+print('Number of luminous galaxies: {len}'.format(len=len(luminous_df)))
 
-#     if len(bin_mass) > 1:
-#         median_bin_mass = np.mean(bin_mass)
-#         mass_curve.append(median_bin_mass)
-#     elif len(bin_mass) == 1:
-#         mass_curve.append(bin_mass[0])
-#     else:
-#         mass_curve.append(0)
+fname = 'derived_datasets\\R{r}_D{d}_0.02\\'.format(r=R, d=D)
 
-# mass_curve = np.array(mass_curve)
-# assert len(mass_curve) == len(bins)
+candidate_bcg = pd.read_csv(fname+'candidate_bcg.csv')
+candidate_members = pd.read_csv(fname+'candidate_members.csv')
+print('Number of candidate clusters: {len}'.format(len=len(candidate_bcg)))
 
-plt.figure()
-# plt.scatter(cosmic_web_bcg_arr[:,2], np.log10(masses), s=8)
-# plt.plot(bins, np.log10(mass_curve), 'r--')
-plt.scatter(gal_weight_arr[:,3], np.log10(gal_weight_arr[:,8]), s=8)
-plt.show()
+bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
+member_df = pd.read_csv(fname+'filtered_members.csv')
+print('Number of filtered clusters: {len}'.format(len=len(bcg_df)))
+
+
+

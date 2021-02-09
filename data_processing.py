@@ -63,6 +63,7 @@ def split_df_into_groups(df, column, n):
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
 # ultra_deep_df = fits_to_df('J_MNRAS_423_2436_table1.dat.fits')
 
+
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
 

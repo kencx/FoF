@@ -10,6 +10,10 @@ import astropy.constants as const
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import LambdaCDM
 from astropy.modeling.models import NFW
+from astropy.stats import bootstrap
+from astropy.utils import NumpyRNGContext
+
+from data_processing import split_df_into_groups
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
@@ -93,7 +97,7 @@ def virial_mass_estimator(cluster_members): # INCLUDE MASS WEIGHTING
     cluster_radius = projected_radius(cluster_size, total_separation)
     mass = cluster_mass(cluster_vel_disp, cluster_radius)
 
-    return mass, cluster_vel_disp, cluster_radius
+    return mass.value #, cluster_vel_disp, cluster_radius
 
 
 def projected_mass_estimator(cluster_center, cluster_members):
@@ -145,12 +149,40 @@ def mass_correction(mass, r_200, bcg_arr):
     return mass - C
 
 
-if __name__ == "__main__":
-    pass
-    # bcg_df = pd.read_csv('filtered_bcg.csv')
 
-    # bcg_arr = bcg_df.sort_values('cluster_id').values
-    # masses = np.loadtxt('test_virial_masses.txt')
+def uncertainty(cluster_members):
+    bootfunc = lambda x: virial_mass_estimator(x)
+    with NumpyRNGContext(1):
+        bootresult = bootstrap(cluster_members, bootnum=50) # returns 50 samples of 1 cluster
+    return bootresult
+
+
+
+if __name__ == "__main__":
+    fname = 'derived_datasets\\R25_D4_0.02_1.5r\\'
+    bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
+    member_df = pd.read_csv(fname+'filtered_members.csv')
+
+    bcg_arr = bcg_df.sort_values('cluster_id').values
+    masses = np.loadtxt(fname+'virial_masses.txt')
+
+    arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
+    bootvalues = np.zeros((len(group_n),50))
+
+    for i, g in enumerate(group_n):
+        cluster = arr[arr[:,-1]==g]
+        # center = bcg_arr[bcg_arr[:,-1]==g]
+        # if estimator == 'virial':
+        bootvalues[i] = uncertainty(cluster[:,:3])
+        if i == 0:
+            break
+
+    plt.figure()
+    plt.hist(bootvalues[0], bins=30)
+    plt.show()
+    
+    
+
 
     # corrected_mass = mass_correction(masses, 2, bcg_arr).value
     # np.savetxt('corrected_masses.txt', corrected_mass)
@@ -162,6 +194,8 @@ if __name__ == "__main__":
     # plt.axis()
     # plt.scatter(masses, (masses-corrected_mass)/masses, s=8, alpha=0.75)
     # plt.show()
+
+
 
 
     
