@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import itertools
 
 from scipy.integrate import quad_vec
-# from quadpy import quad
 from astropy import units as u
 import astropy.constants as const
 from astropy.coordinates import SkyCoord
@@ -14,28 +13,10 @@ from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 
 from data_processing import split_df_into_groups
+from methods import redshift_to_velocity
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
-def redshift_to_velocity(z):
-    '''
-    Converts redshift to LOS velocity
-
-    Parameters
-    ----------
-    z: array-like, float
-        Redshift
-    
-    Returns
-    -------
-    v: array-like, float
-        Velocity in m/s
-    '''
-
-    c = const.c.to('km/s')
-    # v = c*((1+z)**2 - 1)/((1+z)**2 + 1) # relativistic doppler formula
-    v = c*z
-    return v
 
 # calculate velocity dispersion for an array of velocities
 def velocity_dispersion(v_arr, group_size):

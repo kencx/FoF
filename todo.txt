@@ -54,6 +54,7 @@ ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE
     2. Can relate to cosmological parameters?
 11. Examine differences of clusters with different N or R
 12. Compare sample with SDSS sample
+13. Look at unsupervised clustering methods
 
 
 SELECTION CRITERIA FOR ABELL CATALOGUE
@@ -67,4 +68,3 @@ The approximate frequency of Abell clusters is one per 2.4 × 105 cubic megapars
 Feedback from presentation
 - From Dr Cindy: How did you determine the d and z bins to search around?
 - What is the ratio of these factors
-- little h value can't use 0.7 for all redshifts, as it changes
