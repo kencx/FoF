@@ -7,35 +7,31 @@ DONE:
     3.2 Interloper removal (3sigma cutting)
 4. Do a sensitivity test for R and D by catalog matching and richness tests
     4.1 Deep field catalog, Cosmic web catalog, ultra-deep catalog
-5. Obtain mass estimates
-    5.1 Compare projected and virial masses
+5. Obtained mass, vel_disp, virial radius, luminosity for each cluster
+    5.1 Compared projected and virial masses
 
 
-
-TO DO: (not in order of importance)
-1. Check through sample and filter cluster near edges
-2. Select 4 random clusters, perform some dynamical analysis to check results
-    2.1 Plot their velocity dispersion against radius dependence
-    2.2 Plot their galaxy locations
+URGENT TO DO:
+1. Speed up overdensity checking
+2. All cKDTree instances are wrong (uses euclidean instead of angular distances)
+3. Clustering algorithms (DBSCAN & OPTICS) parameters
 4. Perform bootstrapping to calculate uncertainties
-    4.1 Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
-5. Obtain parameters for all clusters and add to DB
-    1. Cluster Mass before interloper removal 
-    2. Cluster Mass after interloper removal
-    3. Virial radius
-    4. Cluster velocity dispersion
-    5. Lumonosity of 4 brightest members
-6. Make the following decisions to FoF algorithm:
-    6.1 Decide whether to include convergent estimation of r200 in interloper removal (is r200 really reliable?)
-7. How to determine radii of clusters?
-  7.1 Using r200?
-  7.2 Plot clusters and look at the centralised region
-  7.3 Largest projected separation between center and member galaxy
+    1 Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
+
+
+TO DO:
+1. Check through sample and filter cluster near edges (automate?)
+2. Select 4 random clusters, perform some dynamical analysis to check results
+    1 Plot their velocity dispersion against radius dependence
+    2 Plot their galaxy locations
+3. How to determine radii of clusters?
+  1. Using r200?
+  2. Plot clusters and look at the centralised region
+  3. Largest projected separation between center and member galaxy
 
 
 SEMI IMPORTANT
 1. Apply mass weighting to virial_mass_estimator
-2. Compare sample masses with catalogue masses
 
 
 ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE

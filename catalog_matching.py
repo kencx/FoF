@@ -1,3 +1,4 @@
+import pickle
 import sqlite3
 import numpy as np
 import pandas as pd
@@ -6,32 +7,29 @@ from scipy.stats import linregress
 import astropy.units as u
 from astropy.cosmology import LambdaCDM
 from astropy.coordinates import SkyCoord, Distance, match_coordinates_sky
-from FoF_algorithm import linear_to_angular_dist, redshift_to_velocity
+from analysis.methods import linear_to_angular_dist
 
-import logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s -  %(levelname)s -  %(message)s")
-logging.getLogger('matplotlib.font_manager').disabled = True
-logging.disable(logging.CRITICAL)
-
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif', size=14)
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
+import logging
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
+logging.getLogger('matplotlib.font_manager').disabled = True
 
-# ---
-richness = 25
-D = 4
-fname = 'derived_datasets\\R{r}_D{d}_0.02_1.5r\\'.format(r=richness, d=D)
+checking = True # change to False if finalizing plots
 
-bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
-member_galaxy_df = pd.read_csv(fname+'filtered_members.csv')
+if not checking:
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif', size=14)
 
-bcg_arr = bcg_df.values
-# arr, group_n = split_df_into_groups(member_galaxy_df, 'cluster_id')
+R = 25
+D = 2
+fname = f'analysis\\derived_datasets\\R{R}_D{D}_vel\\'
+with open(fname+'clusters.dat', 'rb') as f:
+    virial_clusters = pickle.load(f)
 
 
 # ---- import catalogue table
-conn = sqlite3.connect('galaxy_clusters.db')
+conn = sqlite3.connect('processing\\datasets\\galaxy_clusters.db')
 
 deep_field_df = pd.read_sql_query('''
     SELECT ra, dec, redshift, Ngal, R
@@ -59,10 +57,10 @@ ultra_deep_arr = ultra_deep_df.values
 
 conn.close()
 
-xray_df = pd.read_csv('datasets\\xray_group_catalog_tbl.csv')
-xray_df = xray_df[['ra','dec','redshift','nmem']]
-xray_df = xray_df[(xray_df['redshift']>=0.5) & (xray_df['nmem']>=15)]
-xray_arr = xray_df.values
+# xray_df = pd.read_csv('datasets\\xray_group_catalog_tbl.csv')
+# xray_df = xray_df[['ra','dec','redshift','nmem']]
+# xray_df = xray_df[(xray_df['redshift']>=0.5) & (xray_df['nmem']>=15)]
+# xray_arr = xray_df.values
 
 
 def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
@@ -92,20 +90,27 @@ def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
     sample_richness = np.zeros(len(cluster_sample))
     cluster_matched = np.zeros((len(cluster_sample), 3))
 
-    min_redshift, max_redshift = min(cluster_sample[:,2]), max(cluster_sample[:,2])
-    print('Minimum redshift: {min}; Maximum redshift: {max}'.format(min=min_redshift, max=max_redshift))
-    
-    cluster_sample = cluster_sample[(cluster_sample[:,2] >= min_redshift)&(cluster_sample[:,2]<= max_redshift)]
-    cluster_catalog = cluster_catalog[(cluster_catalog[:,2] >= min_redshift)&(cluster_catalog[:,2]<= max_redshift)]
-    logging.debug('No. of galaxies in sample: {n_cand} and No. of galaxies in catalog: {n_catalog}'.format(n_cand=len(cluster_sample), n_catalog=len(cluster_catalog)))
+    sample_c = np.array([c.richness for c in cluster_sample])
+    coords = np.array([[c.ra, c.dec, c.z] for c in cluster_sample])
+    z_arr = np.array([c.z for c in cluster_sample])
 
-    sample_coords = SkyCoord(cluster_sample[:,0]*u.degree, cluster_sample[:,1]*u.degree)
+    min_redshift, max_redshift = min(z_arr), max(z_arr)
+    print(f'Minimum redshift: {min_redshift}; Maximum redshift: {max_redshift}')
+    
+    coords = coords[(coords[:,2] >= min_redshift) & (coords[:,2]<= max_redshift)]
+    cluster_catalog = cluster_catalog[(cluster_catalog[:,2] >= min_redshift) & (cluster_catalog[:,2]<= max_redshift)]
+    logging.debug(f'No. of galaxies in sample: {len(cluster_sample)} and No. of galaxies in catalog: {len(cluster_catalog)}')
+
+    sample_coords = SkyCoord(coords[:,0]*u.degree, coords[:,1]*u.degree)
 
     for i, c in enumerate(cluster_catalog): # for each cluster in the catalog, find matching sample clusters
 
         z_cut = 0.04*(1+c[2])
-        z_cut_coords = sample_coords[abs(cluster_sample[:,2] - c[2]) <= z_cut]
-        sample_cut = cluster_sample[abs(cluster_sample[:,2] - c[2]) <= z_cut][:,6]
+        mask = abs(coords[:,2] - c[2]) <= z_cut
+        z_cut_coords = coords[mask]
+        # z_cut_coords = np.column_stack((z_cut_coords[:,0]*u.deg, z_cut_coords[:,1]*u.deg))
+        z_cut_coords = SkyCoord(z_cut_coords[:,0]*u.deg, z_cut_coords[:,1]*u.deg)
+        sample_cut = sample_c[mask]
 
         max_sep = linear_to_angular_dist(0.5*u.Mpc/u.littleh, c[2])
         c_coord = SkyCoord(c[0]*u.degree, c[1]*u.degree)
@@ -116,7 +121,7 @@ def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
                 sample_matches = z_cut_coords[idx]
                 if (sample_matches):
                     count += 1
-                    cluster_matched[i,:] = cluster_sample[idx][:3]
+                    cluster_matched[i,:] = coords[idx,:]
                     catalogue_richness[i] = cluster_catalog[i,-1]
                     sample_richness[i] = sample_cut[idx]
 
@@ -140,10 +145,10 @@ def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
 
     return cluster_matched
 
-# xray_matched = compare_clusters(bcg_arr, xray_arr, richness_plot=False)
-# cosmic_web_matched = compare_clusters(bcg_arr, cosmic_web_arr, richness_plot=False)
-# ultra_deep_matched = compare_clusters(bcg_arr, ultra_deep_arr, richness_plot=False)
-# deep_field_matched = compare_clusters(bcg_arr, deep_field_arr, richness_plot=False)
+# xray_matched = compare_clusters(virial_clusters, xray_arr, richness_plot=False)
+cosmic_web_matched = compare_clusters(virial_clusters, cosmic_web_arr, richness_plot=True)
+ultra_deep_matched = compare_clusters(virial_clusters, ultra_deep_arr, richness_plot=True)
+deep_field_matched = compare_clusters(virial_clusters, deep_field_arr, richness_plot=True)
 # ultra_deep_matched = ultra_deep_matched[ultra_deep_matched>0].reshape(-1,3)
 # cosmic_web_matched = cosmic_web_matched[cosmic_web_matched>0].reshape(-1,3)
 

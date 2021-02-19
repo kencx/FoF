@@ -1,19 +1,19 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 import itertools
-
+import numpy as np
+import matplotlib.pyplot as plt
 from scipy.integrate import quad_vec
+
 from astropy import units as u
 import astropy.constants as const
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import LambdaCDM
+
 from astropy.modeling.models import NFW
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 
-from data_processing import split_df_into_groups
-from methods import redshift_to_velocity
+from processing.methods import split_df_into_groups
+from analysis.methods import redshift_to_velocity
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
@@ -29,17 +29,16 @@ def projected_radius(group_size, separation):
 # evaluate cluster mass
 def cluster_mass(cluster_vel_disp, projected_radius):
     mass = (3/2)*np.pi*(cluster_vel_disp*projected_radius)/const.G
-    return mass.to(u.M_sun)
+    return mass.to(u.M_sun/u.littleh)
 
 
-def virial_mass_estimator(cluster_members): # INCLUDE MASS WEIGHTING
-
-    ''' Calculates virial masses of galaxy clusters with the virial mass formula
+def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
+    ''' 
+    Calculates virial masses of galaxy clusters with the virial mass formula
 
     Parameters
     ----------
-    cluster: array-like
-        Array of cluster members with key properties: ['ra', 'dec', 'redshift']
+    cluster: Cluster object
     
     Returns
     -------
@@ -47,58 +46,62 @@ def virial_mass_estimator(cluster_members): # INCLUDE MASS WEIGHTING
         Mass of cluster in M_sun
 
     cluster_vel_disp: float
-        Estimated velocity dispersion of cluster in (m/s)**2
+        Estimated velocity dispersion of cluster in (km/s)**2
 
     cluster_radius: float
         Estimated radius of cluster in Mpc
     '''
+    member_galaxies = cluster.galaxies
 
     # velocity dispersion
-    cluster_size = len(cluster_members)
-    photoz_arr = cluster_members[:,2]
+    cluster_size = len(member_galaxies)
+    z_arr = member_galaxies[:,2]
 
-    average_redshift = np.mean(photoz_arr)
-    cluster_vel = (redshift_to_velocity(photoz_arr) - redshift_to_velocity(average_redshift))/(1+average_redshift)
+    average_redshift = np.mean(z_arr)
+    cluster_vel = (redshift_to_velocity(z_arr) - redshift_to_velocity(average_redshift))/(1+average_redshift)
     cluster_vel_disp = velocity_dispersion(cluster_vel, cluster_size)
 
     # galaxy separations
-    c = SkyCoord(ra=cluster_members[:,0]*u.degree, dec=cluster_members[:,1]*u.degree) # array of coordinates
+    c = SkyCoord(ra=member_galaxies[:,0]*u.degree, dec=member_galaxies[:,1]*u.degree) # array of coordinates
     
     pairs_idx = np.asarray(list((i,j) for ((i,_), (j,_)) in itertools.combinations(enumerate(c), 2))) # index of galaxies in combinations
-    photoz_pairs = np.take(photoz_arr, pairs_idx) # photoz values of galaxies from the indices
-    d_A = cosmo.angular_diameter_distance(z=photoz_pairs[:,0]) # angular diameter distance
+    photoz_pairs = np.take(z_arr, pairs_idx) # photoz values of galaxies from the indices
+    d_A = cosmo.angular_diameter_distance(z=average_redshift) # angular diameter distance
 
     pairs = c[pairs_idx]
     total_separation = 0
 
     projected_sep = pairs[:,0].separation(pairs[:,1]) # projected separation (in deg)
-    actual_sep = (np.multiply(projected_sep,d_A)).to(u.Mpc, u.dimensionless_angles()) # convert projected separation to Mpc
+    actual_sep = (projected_sep*d_A).to(u.Mpc, u.dimensionless_angles()) # convert projected separation to Mpc
+    actual_sep = ((actual_sep*((cosmo.H0/100).value))/u.littleh).to(u.Mpc/u.littleh) # include littleh scaling
     total_separation = sum(1/actual_sep)
     
     cluster_radius = projected_radius(cluster_size, total_separation)
     mass = cluster_mass(cluster_vel_disp, cluster_radius)
 
-    return mass.value #, cluster_vel_disp, cluster_radius
+    return mass, cluster_vel_disp, cluster_radius # M_sun/littleh, km^2/s^2, Mpc/littleh
 
 
-def projected_mass_estimator(cluster_center, cluster_members):
-    N = len(cluster_members)
+def projected_mass_estimator(cluster):
 
-    average_redshift = np.mean(cluster_members[:,2])
-    cluster_velocity = (redshift_to_velocity(cluster_members[:,2]) - redshift_to_velocity(average_redshift))/(1+average_redshift) # in km/s
+    member_galaxies = cluster.galaxies
+    N = len(member_galaxies)
+    average_redshift = np.mean(member_galaxies[:,2])
+    cluster_velocity = (redshift_to_velocity(member_galaxies[:,2]) - redshift_to_velocity(average_redshift))/(1+average_redshift) # in km/s
 
-    c = SkyCoord(ra=cluster_members[:,0]*u.degree, dec=cluster_members[:,1]*u.degree)
-    centroid = SkyCoord(ra=np.mean(cluster_members[:,0])*u.degree, dec=np.mean(cluster_members[:,1])*u.degree)
+    c = SkyCoord(ra=member_galaxies[:,0]*u.degree, dec=member_galaxies[:,1]*u.degree)
+    centroid = SkyCoord(ra=np.mean(member_galaxies[:,0])*u.degree, dec=np.mean(member_galaxies[:,1])*u.degree)
     # center = SkyCoord(ra=cluster_center[:,0]*u.degree, dec=cluster_center[:,1]*u.degree)
 
     cluster_separation = centroid.separation(c)
     d_A = cosmo.angular_diameter_distance(z=average_redshift)
     actual_separation = (cluster_separation*d_A).to(u.Mpc, u.dimensionless_angles())
+    actual_separation = (actual_separation*((cosmo.H0/100).value)/u.littleh).to(u.Mpc/u.littleh) # include littleh scaling
 
     sumproduct = np.sum(actual_separation*cluster_velocity**2)
     projected_mass = (32/np.pi)*(1/const.G)*(1/(N-1.5))*sumproduct
 
-    return projected_mass.to(u.M_sun)
+    return projected_mass.to(u.M_sun/u.littleh)
 
 
 def mass_correction(mass, r_200, bcg_arr):
@@ -130,7 +133,6 @@ def mass_correction(mass, r_200, bcg_arr):
     return mass - C
 
 
-
 def uncertainty(cluster_members):
     bootfunc = lambda x: virial_mass_estimator(x)
     with NumpyRNGContext(1):
@@ -140,31 +142,32 @@ def uncertainty(cluster_members):
 
 
 if __name__ == "__main__":
-    fname = 'derived_datasets\\R25_D4_0.02_1.5r\\'
-    bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
-    member_df = pd.read_csv(fname+'filtered_members.csv')
+    pass
+    # fname = 'derived_datasets\\R25_D4_0.02_1.5r\\'
+    # bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
+    # member_df = pd.read_csv(fname+'filtered_members.csv')
 
-    bcg_arr = bcg_df.sort_values('cluster_id').values
-    masses = np.loadtxt(fname+'virial_masses.txt')
+    # bcg_arr = bcg_df.sort_values('cluster_id').values
+    # masses = np.loadtxt(fname+'virial_masses.txt')
 
-    arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
-    bootvalues = np.zeros((len(group_n),50))
+    # arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
+    # bootvalues = np.zeros((len(group_n),50))
 
-    for i, g in enumerate(group_n):
-        cluster = arr[arr[:,-1]==g]
-        # center = bcg_arr[bcg_arr[:,-1]==g]
-        # if estimator == 'virial':
-        bootvalues[i] = uncertainty(cluster[:,:3])
-        if i == 0:
-            break
+    # for i, g in enumerate(group_n):
+    #     cluster = arr[arr[:,-1]==g]
+    #     # center = bcg_arr[bcg_arr[:,-1]==g]
+    #     # if estimator == 'virial':
+    #     bootvalues[i] = uncertainty(cluster[:,:3])
+    #     if i == 0:
+    #         break
 
-    plt.figure()
-    plt.hist(bootvalues[0], bins=30)
-    plt.show()
+    # plt.figure()
+    # plt.hist(bootvalues[0], bins=30)
+    # plt.show()
     
     
 
-
+# -----------------
     # corrected_mass = mass_correction(masses, 2, bcg_arr).value
     # np.savetxt('corrected_masses.txt', corrected_mass)
 

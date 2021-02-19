@@ -1,3 +1,4 @@
+import pickle
 import sqlite3
 import numpy as np
 import pandas as pd
@@ -7,14 +8,60 @@ from matplotlib import cm
 from scipy.stats import linregress
 from scipy import optimize
 
-from data_processing import split_df_into_groups
+# from processing.methods import split_df_into_groups
 
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif', size=14)
+import logging
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
+logging.getLogger('matplotlib.font_manager').disabled = True
+
+checking = True # change to False if finalizing plots
+
+if not checking:
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif', size=14)
+
+R = 25
+D = 2
+fname = f'analysis\\derived_datasets\\R{R}_D{D}_vel\\'
+with open(fname+'clusters.dat', 'rb') as f:
+    virial_clusters = pickle.load(f)
 
 
+# -- plotting clusters for manual checking (do not use, find somewhere else to put this)
+def check_plots(clusters):
 
-# --------------------------- RA against DEC ------------------------------
+    coords = np.array([[c.ra, c.dec] for c in clusters])
+    clusters = np.array(clusters)
+    z_arr = np.array([c.z for c in clusters])        
+
+    bins = np.linspace(0.5,2.53,83) # bins of 0.03 width
+    # bins = np.arange(0.5,2.53,0.00666)
+    digitized = np.digitize(z_arr, bins)
+
+    for i in range(1,len(bins)):
+        binned_data = clusters[np.where(digitized==i)]
+        binned_data = sorted(binned_data, key=lambda x: x.ra)
+        logging.info(f'Number of clusters in bin {i}: {len(binned_data)}')
+
+        if len(binned_data): # plot clusters for checking
+            fig = plt.figure(figsize=(10,8))
+            logging.info(f'Plotting bin {i}. Clusters with binned redshift {bins[i]}')
+            # plt.hist2d(x=arr[:,0], y=arr[:,1], bins=(100,80), cmap=plt.cm.Reds)
+
+            for center in binned_data:
+                plt.scatter(center.galaxies[:,0], center.galaxies[:,1], s=5)
+                plt.scatter(center.ra, center.dec, s=10)
+                plt.axis([min(coords[:,0]), max(coords[:,0]), min(coords[:,1]), max(coords[:,1])])
+                logging.info('Plotting ' + center.__str__())
+            plt.show()
+
+
+# check_plots(virial_clusters)
+
+
+##########################
+# RA VS DEC DENSITY PLOT #
+##########################
 # df = pd.read_csv('datasets\\cosmos2015_dataset.csv')
 # columns = ['ra', 'dec', 'ID', 'zphot', 'redshift', 'z_lower', 'z_upper+', 'RMag', 'Class', 'log_Stellar_Mass', 'log_SFR', 'LR'] # renaming columns
 # df.columns = columns
@@ -31,7 +78,9 @@ plt.rc('font', family='serif', size=14)
 # plt.show()
 
 
-# --------------------------- Magnitude Histogram ----------------------------
+################################
+# ABSOLUTE MAGNITUDE HISTOGRAM # (add redshift distribution?)
+################################
 
 # fig, ax = plt.subplots(figsize=(12,8), sharey=True)
 # main_ax = plt.subplot2grid((3,3), (0,0), rowspan=3, colspan=2, fig=fig)
@@ -87,40 +136,12 @@ plt.rc('font', family='serif', size=14)
 # plt.show()
 
 
-# ---------------------- Mass against redshift -----------------------------
-R = 25
-D = 4
-fname = 'derived_datasets\\R{r}_D{d}_0.02_1.5r\\'.format(r=R, d=D)
-
-bcg_df = pd.read_csv(fname+'filtered_bcg.csv')
-# member_df = pd.read_csv(fname+'filtered_members.csv')
-bcg_arr = bcg_df.sort_values('cluster_id').values
-masses = np.loadtxt(fname+'virial_masses.txt')
-
-# k, = np.where(bcg_arr1[:,2] <= 2.0)
-# bcg_arr1 = bcg_arr1[k,:]
-# masses = masses[k]
-
-# bins = np.arange(0.5,2.0+0.2,0.2)
-# digitized = np.digitize(bcg_arr[:,2], bins, right=True)
-# mass_curve = []
-
-# for i in range(1,len(bins)+1):
-#         bin_mass = masses[np.where(digitized==i)]
-#         if len(bin_mass) > 1:
-#                 median_bin_mass = np.mean(bin_mass)
-#                 mass_curve.append(median_bin_mass)
-#         elif len(bin_mass) == 1:
-#                 mass_curve.append(bin_mass[0])
-#         else:
-#                 mass_curve.append(0)
-
-# mass_curve = np.array(mass_curve)
-# assert len(mass_curve) == len(bins)
+####################
+# MASS VS REDSHIFT #
+####################
 
 # fig, ax = plt.subplots(figsize=(12,8))
 # p = ax.scatter(bcg_arr[:,2], np.log10(masses), s=8, color='tab:blue', alpha=0.75, label='Cluster Mass')
-# # ax.plot(bins, np.log10(mass_curve), 'r--', label='Median log($\mathrm{M/M_\odot}$)')
 
 # ax.set_title('Estimated Virial Mass against Redshift')
 # ax.set_xlabel('Redshift')
@@ -137,11 +158,9 @@ masses = np.loadtxt(fname+'virial_masses.txt')
 # plt.show()
 
 
-
-# ------------------ Virial mass against projected mass --------------------------------
-# projected = np.loadtxt(fname+'projected_masses.txt')
-# virial = np.loadtxt(fname+'virial_masses.txt')
-
+#################################
+# VIRIAL MASS VS PROJECTED MASS #
+#################################
 
 # fig, ax = plt.subplots(figsize=(12,8))
 # ax.scatter(x=np.log10(virial), y=np.log10(projected), s=10, alpha=0.75)
@@ -171,7 +190,41 @@ masses = np.loadtxt(fname+'virial_masses.txt')
 # plt.show()
 
 
-# --------- velocity against radius -----------------
+##################################
+# RICHNESS VS ABSOLUTE MAGNITUDE #
+##################################
+
+# R_arr = np.array([c.richness for c in virial_clusters])
+
+# def get_lum(c):
+#     member_galaxies = c.galaxies
+#     lum = member_galaxies[member_galaxies[:,3].argsort()][2,3]
+#     return lum
+
+# lum_arr = np.array([get_lum(c) for c in virial_clusters])
+
+# X = np.linspace(min(R_arr),max(R_arr),100)
+# m2,c2,r2,_,_ = linregress(R_arr, lum_arr)
+# print(m2, c2, r2)
+
+# fig, ax = plt.subplots(figsize=(10,8))
+# plt.gca().invert_yaxis()
+
+# ax.scatter(R_arr, lum_arr, s=8, alpha=0.5, color='tab:blue')
+# ax.plot(X, m2*X+c2, 'r--', label='Regression Best Fit, $y = {m}x+{c}, R^2 = {r2}$'.format(m=round(m2,4), c=round(c2,1), r2=round(r2,3)))
+
+# ax.set_xlabel('Richness R')
+# ax.set_ylabel('2nd Brightest Galaxy Absolute Magnitude (mag)')
+
+# plt.legend(frameon=False)
+# plt.show()
+
+
+
+#################################
+# VELOCITY DISPERSION VS RADIUS # (STILL WIP)
+#################################
+
 # from FoF_algorithm import linear_to_angular_dist
 # from mass_estimator import redshift_to_velocity
 # from astropy.cosmology import LambdaCDM
@@ -238,38 +291,41 @@ masses = np.loadtxt(fname+'virial_masses.txt')
 #     plt.show()
 
 
-# ------ richness against Abs Mag
-# bcg_df = pd.read_csv(fname+'filtered_bcg.csv').sort_values('cluster_id')
-# member_df = pd.read_csv(fname+'filtered_members.csv')
-# # virial = np.loadtxt(fname+'virial_masses.txt')
+#################################
+# REDSHIFT EVOLUTION # (STILL WIP)
+#################################
 
-# bcg_arr = bcg_df.values
-# arr, group_n = split_df_into_groups(member_df, 'cluster_id', -1)
-# total_lum = np.zeros(len(bcg_df))
+# parameters to compare:
+    # mass vs vel_disp: strong linear relationship
+    # mass vs lum4: high scatter
+    # mass vs abs mag: 
+    # mass vs richness: scatter
+    # mass vs radius: linear relationship
 
-# for i, g in enumerate(group_n):
-#     center = bcg_arr[bcg_arr[:,-1]==g]
-#     cluster_members = arr[arr[:,-1]==g]
-#     lum2 = cluster_members[cluster_members[:,3].argsort()][2,3]
-#     total_lum[i] = lum2
+    # vel_disp vs radius: scatter
+    # vel disp vs richness: scatter
+    # vel_disp vs lum4: scatter
 
-# # bcg_df = bcg_df[bcg_df['total_N'] <= 190]
-# # k, = np.where(bcg_df['total_N'] <= 190)
-# # total_lum = total_lum[k]
+    # lum4 vs radius: slight linear relationship
+    # richness vs radius: weird power trend?
+    # lum4 vs richness: new clusters linear relationship
 
-# X = np.linspace(min(bcg_df['total_N']),max(bcg_df['total_N']),100)
-# m2,c2,r2,_,_ = linregress(bcg_df['total_N'], total_lum)
-# print(m2, c2, r2)
+# globally, old clusters have higher mass, higher radius, lower richness (less galaxies at high z), higher luminosity (malmquist bias)
 
-# fig, ax = plt.subplots(figsize=(10,8))
-# plt.gca().invert_yaxis()
+old_clusters = [c for c in virial_clusters if c.z > 1.5]
+new_clusters = [c for c in virial_clusters if c.z <= 1.5]
 
-# ax.scatter(bcg_df['total_N'], total_lum, s=8, alpha=0.5, color='tab:blue')
+new_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in new_clusters])
+old_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in old_clusters])
+
+fig, ax = plt.subplots(figsize=(10,8))
+ax.scatter(new_c_params[:,-2], new_c_params[:,-3], s=8, alpha=0.5, color='tab:blue', label='Young')
+ax.scatter(old_c_params[:,-2], old_c_params[:,-3], s=8, alpha=0.5, color='tab:red', label='Old')
+
 # ax.plot(X, m2*X+c2, 'r--', label='Regression Best Fit, $y = {m}x+{c}, R^2 = {r2}$'.format(m=round(m2,4), c=round(c2,1), r2=round(r2,3)))
 
-# ax.set_xlabel('Richness R')
-# ax.set_ylabel('2nd Brightest Galaxy Absolute Magnitude (mag)')
+ax.set_xlabel('')
+ax.set_ylabel('')
 
-# plt.subplots_adjust(wspace= 0.3)
-# plt.legend(frameon=False)
-# plt.show()
+plt.legend(frameon=False)
+plt.show()

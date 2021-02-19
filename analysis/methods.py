@@ -1,13 +1,7 @@
-
 import numpy as np
-import pandas as pd
-
-from scipy.spatial import cKDTree
-
 from astropy import units as u
-from astropy.constants import G
+from astropy import constants as const
 from astropy.cosmology import LambdaCDM
-from astropy.coordinates import SkyCoord
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
@@ -54,6 +48,7 @@ def mean_separation(n, radius):
     density = n/volume
     return 1/(density**(1/3))
 
+
 def redshift_to_velocity(z):
     '''
     Converts redshift to LOS velocity
@@ -70,6 +65,5 @@ def redshift_to_velocity(z):
     '''
 
     c = const.c.to('km/s')
-    # v = c*((1+z)**2 - 1)/((1+z)**2 + 1) # relativistic doppler formula
     v = c*z
     return v
