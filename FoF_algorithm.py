@@ -7,10 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import cKDTree
 
 from astropy import units as u
-from astropy.cosmology import LambdaCDM
 from astropy.coordinates import SkyCoord
-
-cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
 from params import *
 from cluster import Cluster
