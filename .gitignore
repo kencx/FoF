@@ -1,3 +1,15 @@
 archived
-.vscode
+backup
+
+processing\\__pycache__
+processing\\datasets
+todo.txt
+
+analysis\\__pycache__
+analysis\\derived_datasets
+analysis\\figures
+analysis\\export.py
+
 __pycache__
+.vscode
+testing.py
