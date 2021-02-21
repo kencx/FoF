@@ -50,29 +50,6 @@ class Cluster:
         return self_galaxies, other_galaxies
 
 
-    # def merge(self, other):
-    #     if not isinstance(other, type(self)):
-    #         return NotImplemented
-    #     pass # compare N(0.5) of two clusters, keep larger cluster with merged points and deletes smaller one. if both have same N(0.5), compare brightness instead
-
-    #     combined = np.concatenate((self.galaxies, other.galaxies), axis=0) # combine the galaxy arrays
-    #     arr, uniq_count = np.unique(combined, axis=0, return_counts=True)
-    #     combined = arr[uniq_count==1] # ensure all points are unique
-
-    #     if self.N > other.N:
-    #         self.galaxies = combined
-    #         other.galaxies = np.array([])
-    #     elif self.N < other.N:
-    #         self.galaxies = np.array([])
-    #         other.galaxies = combined
-    #     elif abs(self.bcg_brightness) > abs(other.bcg_brightness):
-    #         self.galaxies = combined
-    #         other.galaxies = np.array([]) 
-    #     else:
-    #         self.galaxies = np.array([])
-    #         other.galaxies = combined
-
-
     def export(self): # export to dataframe
         pass
 
@@ -92,3 +69,4 @@ class CleanedCluster(Cluster):
         self.vel_disp = vel_disp
         self.virial_radius = virial_radius
         self.total_luminosity = lum4
+        # self.edge_flag = 0

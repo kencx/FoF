@@ -12,9 +12,10 @@ from astropy.coordinates import SkyCoord
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
 
+from params import *
 from cluster import Cluster
-from analysis.methods import linear_to_angular_dist, mean_separation, redshift_to_velocity
 from plotting import check_plots
+from analysis.methods import linear_to_angular_dist, mean_separation, redshift_to_velocity
 
 import logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
@@ -383,23 +384,7 @@ def interloper_removal(data):
 
 if __name__ == "__main__":
 
-    ##############
-    # PARAMETERS #
-    ##############
-    min_redshift = 0.5
-    max_redshift = 2.5
-
-    max_velocity = 2000
-    linking_length_factor = 0.4
-    virial_radius = 1.5*u.Mpc/u.littleh
-
-    richness = 25
-    D = 2
-
-    fname = f'analysis\\derived_datasets\\' # R{richness}_D{D}_vel\\'
-    plot = False
-
-
+#%%
     ###########################
     # IMPORT RAW DATA FROM DB #
     ###########################
@@ -421,6 +406,7 @@ if __name__ == "__main__":
     # main_arr, luminous_arr = luminous_search(df, max_velocity=2000)
 
 
+#%%
     ######################
     # FRIENDS-OF-FRIENDS #
     ######################
@@ -439,7 +425,7 @@ if __name__ == "__main__":
     with open(fname+'candidates.dat', 'wb') as f:
         pickle.dump(candidates, f)
 
-
+#%%
     ######################
     # INTERLOPER REMOVAL #
     ######################
@@ -452,4 +438,4 @@ if __name__ == "__main__":
         pickle.dump(cleaned_candidates, f)
 
 
-    # final step: save all attributes into df 
+    # save all attributes into df 

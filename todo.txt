@@ -9,25 +9,27 @@ DONE:
     4.1 Deep field catalog, Cosmic web catalog, ultra-deep catalog
 5. Obtained mass, vel_disp, virial radius, luminosity for each cluster
     5.1 Compared projected and virial masses
+6. DBSCAN Clustering Algorithm on existing catalogues (Cosmic Web)
+    6.1 Relatively decent (>0.5) on all metrics
 
 
 URGENT TO DO:
-1. Speed up overdensity checking
-2. All cKDTree instances are wrong (uses euclidean instead of angular distances)
-3. Clustering algorithms (DBSCAN & OPTICS) parameters
-4. Perform bootstrapping to calculate uncertainties
+1. All cKDTree instances are wrong (uses euclidean instead of angular distances)
+2. Perform bootstrapping to calculate uncertainties
     1 Quantities to calculate uncertainty: cluster mass, velocity dispersion, virial radius
+3. Check through sample and filter cluster near edges (flag edge clusters)
 
 
 TO DO:
-1. Check through sample and filter cluster near edges (automate?)
-2. Select 4 random clusters, perform some dynamical analysis to check results
+1. Select 4 random clusters, perform some dynamical analysis to check results
     1 Plot their velocity dispersion against radius dependence
     2 Plot their galaxy locations
-3. How to determine radii of clusters?
-  1. Using r200?
+2. How to determine radii of clusters?
+  1. Using r200? Scale length?, Half light radius?
   2. Plot clusters and look at the centralised region
   3. Largest projected separation between center and member galaxy
+3. OPTICS
+4. Possible to speed up overdensity checking?
 
 
 SEMI IMPORTANT
@@ -50,7 +52,6 @@ ANALYSIS - HALF QUANTITATIVE, HALF QUALITATIVE
     2. Can relate to cosmological parameters?
 11. Examine differences of clusters with different N or R
 12. Compare sample with SDSS sample
-13. Look at unsupervised clustering methods
 
 
 SELECTION CRITERIA FOR ABELL CATALOGUE

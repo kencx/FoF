@@ -3,13 +3,15 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import linregress
+
 import astropy.units as u
 from astropy.cosmology import LambdaCDM
 from astropy.coordinates import SkyCoord, Distance, match_coordinates_sky
-from analysis.methods import linear_to_angular_dist
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
+
+from params import *
+from analysis.methods import linear_to_angular_dist
 
 import logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
@@ -21,38 +23,41 @@ if not checking:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif', size=14)
 
-R = 25
-D = 2
-fname = f'analysis\\derived_datasets\\R{R}_D{D}_vel\\'
+
+
+
 with open(fname+'clusters.dat', 'rb') as f:
     virial_clusters = pickle.load(f)
 
 
-# ---- import catalogue table
+#####################
+# IMPORT CATALOGUES #
+#####################
+
 conn = sqlite3.connect('processing\\datasets\\galaxy_clusters.db')
 
 deep_field_df = pd.read_sql_query('''
     SELECT ra, dec, redshift, Ngal, R
     FROM deep_field 
-    WHERE Ngal>=15 AND redshift>=0.5
+    WHERE Ngal>=? AND redshift>=0.5
     ORDER BY redshift
-    ''', conn)
+    ''', conn, params=(R,))
 deep_field_arr = deep_field_df.values
 
 cosmic_web_df = pd.read_sql_query('''
     SELECT ra, dec, redshift, Ngal
     FROM cosmic_web_bcg
-    WHERE Ngal>=15 AND redshift>=0.5
+    WHERE Ngal>=? AND redshift>=0.5
     ORDER BY redshift
-    ''', conn)
+    ''', conn, params=(R,))
 cosmic_web_arr = cosmic_web_df.values
 
 ultra_deep_df = pd.read_sql_query('''
     SELECT ra, dec, redshift, R
     FROM ultra_deep
-    WHERE R>=15 AND redshift>=0.5
+    WHERE R>=? AND redshift>=0.5
     ORDER BY redshift
-    ''', conn)
+    ''', conn, params=(R,))
 ultra_deep_arr = ultra_deep_df.values
 
 conn.close()
@@ -121,9 +126,9 @@ def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
                 sample_matches = z_cut_coords[idx]
                 if (sample_matches):
                     count += 1
-                    cluster_matched[i,:] = coords[idx,:]
-                    catalogue_richness[i] = cluster_catalog[i,-1]
-                    sample_richness[i] = sample_cut[idx]
+                    # cluster_matched[i,:] = coords[idx,:]
+                    # catalogue_richness[i] = cluster_catalog[i,-1]
+                    # sample_richness[i] = sample_cut[idx]
 
     print('{n}/{total} matched. {number} % of candidates matched'.format(n=count, total=len(cluster_catalog), number=(count/len(cluster_catalog))*100))
     
@@ -145,12 +150,15 @@ def compare_clusters(cluster_sample, cluster_catalog, richness_plot=True):
 
     return cluster_matched
 
-# xray_matched = compare_clusters(virial_clusters, xray_arr, richness_plot=False)
-cosmic_web_matched = compare_clusters(virial_clusters, cosmic_web_arr, richness_plot=True)
-ultra_deep_matched = compare_clusters(virial_clusters, ultra_deep_arr, richness_plot=True)
-deep_field_matched = compare_clusters(virial_clusters, deep_field_arr, richness_plot=True)
-# ultra_deep_matched = ultra_deep_matched[ultra_deep_matched>0].reshape(-1,3)
-# cosmic_web_matched = cosmic_web_matched[cosmic_web_matched>0].reshape(-1,3)
 
-# res = (ultra_deep_matched[:, None] == cosmic_web_matched).all(-1).any(-1)
-# print(sum(res)) # number of clusters matched in both catalogs
+
+if __name__ == "__main__":
+    # xray_matched = compare_clusters(virial_clusters, xray_arr, richness_plot=False)
+    cosmic_web_matched = compare_clusters(virial_clusters, cosmic_web_arr, richness_plot=True)
+    ultra_deep_matched = compare_clusters(virial_clusters, ultra_deep_arr, richness_plot=True)
+    deep_field_matched = compare_clusters(virial_clusters, deep_field_arr, richness_plot=True)
+    ultra_deep_matched = ultra_deep_matched[ultra_deep_matched>0].reshape(-1,3)
+    cosmic_web_matched = cosmic_web_matched[cosmic_web_matched>0].reshape(-1,3)
+
+    res = (ultra_deep_matched[:, None] == cosmic_web_matched).all(-1).any(-1)
+    print(sum(res)) # number of clusters matched in both catalogs

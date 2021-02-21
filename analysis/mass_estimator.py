@@ -12,7 +12,6 @@ from astropy.modeling.models import NFW
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 
-from processing.methods import split_df_into_groups
 from analysis.methods import redshift_to_velocity
 
 cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology

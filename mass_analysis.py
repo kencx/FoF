@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 
-from analysis.mass_estimator import virial_mass_estimator, projected_mass_estimator
+from params import *
 from cluster import CleanedCluster
+from analysis.mass_estimator import virial_mass_estimator, projected_mass_estimator
 
 
 def find_masses(data, estimator): # adapt this into find_quantities, include total_luminosity (or sum of top 4 luminosities)
@@ -80,10 +81,6 @@ def plot_masses(clusters, x, y): # adapt this into plot_quantities, with y vs x
 
 
 if __name__ == "__main__":
-
-    richness = 25
-    D = 2
-    fname = f'analysis\\derived_datasets\\R{richness}_D{D}_vel\\'
 
     with open(fname+'cleaned_candidates.dat', 'rb') as f:
         cleaned_candidates = pickle.load(f)

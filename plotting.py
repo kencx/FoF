@@ -2,13 +2,14 @@ import pickle
 import sqlite3
 import numpy as np
 import pandas as pd
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib import cm
-from scipy.stats import linregress
-from scipy import optimize
 
-# from processing.methods import split_df_into_groups
+from scipy import optimize
+from scipy.stats import linregress
+
+from params import *
 
 import logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
@@ -20,11 +21,9 @@ if not checking:
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif', size=14)
 
-R = 25
-D = 2
-fname = f'analysis\\derived_datasets\\R{R}_D{D}_vel\\'
-with open(fname+'clusters.dat', 'rb') as f:
-    virial_clusters = pickle.load(f)
+
+# with open(fname+'clusters.dat', 'rb') as f:
+#     virial_clusters = pickle.load(f)
 
 
 # -- plotting clusters for manual checking (do not use, find somewhere else to put this)
@@ -59,6 +58,7 @@ def check_plots(clusters):
 # check_plots(virial_clusters)
 
 
+#%%
 ##########################
 # RA VS DEC DENSITY PLOT #
 ##########################
@@ -77,7 +77,7 @@ def check_plots(clusters):
 # cbar.ax.set_ylabel('Counts')
 # plt.show()
 
-
+#%%
 ################################
 # ABSOLUTE MAGNITUDE HISTOGRAM # (add redshift distribution?)
 ################################
@@ -135,7 +135,7 @@ def check_plots(clusters):
 # plt.legend(frameon=False)
 # plt.show()
 
-
+#%%
 ####################
 # MASS VS REDSHIFT #
 ####################
@@ -157,7 +157,7 @@ def check_plots(clusters):
 # # ax.legend(frameon=False)
 # plt.show()
 
-
+#%%
 #################################
 # VIRIAL MASS VS PROJECTED MASS #
 #################################
@@ -189,7 +189,7 @@ def check_plots(clusters):
 
 # plt.show()
 
-
+#%%
 ##################################
 # RICHNESS VS ABSOLUTE MAGNITUDE #
 ##################################
@@ -220,7 +220,7 @@ def check_plots(clusters):
 # plt.show()
 
 
-
+#%%
 #################################
 # VELOCITY DISPERSION VS RADIUS # (STILL WIP)
 #################################
@@ -290,7 +290,7 @@ def check_plots(clusters):
 
 #     plt.show()
 
-
+#%%
 #################################
 # REDSHIFT EVOLUTION # (STILL WIP)
 #################################
@@ -312,20 +312,20 @@ def check_plots(clusters):
 
 # globally, old clusters have higher mass, higher radius, lower richness (less galaxies at high z), higher luminosity (malmquist bias)
 
-old_clusters = [c for c in virial_clusters if c.z > 1.5]
-new_clusters = [c for c in virial_clusters if c.z <= 1.5]
+# old_clusters = [c for c in virial_clusters if c.z > 1.5]
+# new_clusters = [c for c in virial_clusters if c.z <= 1.5]
 
-new_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in new_clusters])
-old_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in old_clusters])
+# new_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in new_clusters])
+# old_c_params = np.array([[c.cluster_mass.value, c.vel_disp.value, c.virial_radius.value, c.total_luminosity, c.richness, c.bcg_brightness] for c in old_clusters])
 
-fig, ax = plt.subplots(figsize=(10,8))
-ax.scatter(new_c_params[:,-2], new_c_params[:,-3], s=8, alpha=0.5, color='tab:blue', label='Young')
-ax.scatter(old_c_params[:,-2], old_c_params[:,-3], s=8, alpha=0.5, color='tab:red', label='Old')
+# fig, ax = plt.subplots(figsize=(10,8))
+# ax.scatter(new_c_params[:,-2], new_c_params[:,-3], s=8, alpha=0.5, color='tab:blue', label='Young')
+# ax.scatter(old_c_params[:,-2], old_c_params[:,-3], s=8, alpha=0.5, color='tab:red', label='Old')
 
 # ax.plot(X, m2*X+c2, 'r--', label='Regression Best Fit, $y = {m}x+{c}, R^2 = {r2}$'.format(m=round(m2,4), c=round(c2,1), r2=round(r2,3)))
 
-ax.set_xlabel('')
-ax.set_ylabel('')
+# ax.set_xlabel('')
+# ax.set_ylabel('')
 
-plt.legend(frameon=False)
-plt.show()
+# plt.legend(frameon=False)
+# plt.show()
