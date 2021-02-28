@@ -1,65 +1,15 @@
 archived
 backup
 
-processing\\__pycache__
-processing\\datasets
+FoF/processing/__pycache__/
+FoF/processing/datasets/
 todo.txt
 
-analysis\\__pycache__
-analysis\\derived_datasets
-analysis\\figures
-analysis\\export.py
+FoF/analysis/__pycache__/
+FoF/analysis/derived_datasets/
+FoF/analysis/figures/
+FoF/analysis/export.py
 
 __pycache__
 .vscode
 testing.py
-
-FoF/analysis/derived_datasets/COSMOS_galaxy_data.csv
-FoF/analysis/derived_datasets/data.ipynb
-FoF/analysis/derived_datasets/galaxy_clusters.db
-FoF/analysis/derived_datasets/luminous_galaxy_redshift0.02.csv
-FoF/analysis/derived_datasets/luminous_galaxy_velocity.csv
-FoF/analysis/derived_datasets/Sensitivity_test.txt
-FoF/analysis/derived_datasets/dbscan/DBSCAN_candidates.dat
-FoF/analysis/derived_datasets/LL_0.1/candidates.dat
-FoF/analysis/derived_datasets/LL_0.1/cleaned_candidates.dat
-FoF/analysis/derived_datasets/LL_0.1/clusters.dat
-FoF/analysis/derived_datasets/R12_D2_0.02/candidates.dat
-FoF/analysis/derived_datasets/R12_D2_0.02/cleaned_candidates.dat
-FoF/analysis/derived_datasets/R12_D2_vel/candidates.dat
-FoF/analysis/derived_datasets/R12_D2_vel/cleaned_candidates.dat
-FoF/analysis/derived_datasets/R12_D2_vel/clusters.dat
-FoF/analysis/derived_datasets/R25_D2_0.02/candidates.dat
-FoF/analysis/derived_datasets/R25_D2_0.02/cleaned_candidates.dat
-FoF/analysis/derived_datasets/R25_D2_vel/candidates.dat
-FoF/analysis/derived_datasets/R25_D2_vel/cleaned_candidates.dat
-FoF/analysis/derived_datasets/R25_D2_vel/clusters.dat
-FoF/analysis/figures/Eg clusters z 1.17.png
-FoF/analysis/figures/Figure_1.png
-FoF/analysis/figures/Magnitude Comparison.png
-FoF/analysis/figures/Magnitude Distribution.png
-FoF/analysis/figures/Magnitude vs R 1.5r.png
-FoF/analysis/figures/Magnitude vs R 1r.png
-FoF/analysis/figures/projected vs virial 1.5r.png
-FoF/analysis/figures/projected vs virial 1r.png
-FoF/analysis/figures/RA vs DEC.png
-FoF/analysis/figures/Redshift Distribution.png
-FoF/analysis/figures/richness comparison with cosmic_web r1.5.png
-FoF/analysis/figures/richness comparison with cosmic_web.png
-FoF/analysis/figures/richness comparison with deep_field.png
-FoF/analysis/figures/richness comparison with ultra_deep r1.5.png
-FoF/analysis/figures/richness comparison with ultra_deep.png
-FoF/analysis/figures/virial mass vs z 1.5r.png
-FoF/analysis/figures/virial mass vs z 1r.png
-FoF/processing/datasets/cosmic_web_members_cleaned.csv
-FoF/processing/datasets/cosmos2015_dataset.csv
-FoF/processing/datasets/gal_weight_cleaned.csv
-FoF/processing/datasets/galaxy_clusters.db
-FoF/processing/datasets/J_ApJ_734_68_table2.dat.fits
-FoF/processing/datasets/J_ApJ_837_16_table1.dat.gz.fits
-FoF/processing/datasets/J_MNRAS_423_2436_table1.dat.fits
-FoF/processing/datasets/ultra_deep_cleaned.csv
-FoF/processing/datasets/xgroups.tbl
-FoF/processing/datasets/xray_group_catalog_tbl.csv
-FoF/processing/datasets/xray_group_member_catalog_tbl.csv
-FoF/processing/datasets/xray_group_members_cleaned.csv
