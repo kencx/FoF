@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from methods import fits_to_df, add_data
 
 # DATA PIPELINE FOR FITS -> DF -> SQLITE3 DATABASE

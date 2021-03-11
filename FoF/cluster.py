@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+
 import numpy as np
+import astropy.units as u
 
 
 class Cluster:
@@ -70,8 +73,12 @@ class CleanedCluster(Cluster):
     def __init__(self, center, galaxies, cluster_mass, vel_disp, virial_radius, lum4):
         super().__init__(center, galaxies)
 
-        self.cluster_mass = cluster_mass  #(before and after interloper removal)
-        self.vel_disp = vel_disp
-        self.virial_radius = virial_radius
+        self.cluster_mass = cluster_mass  # h^-1 M_sun
+        self.vel_disp = vel_disp # (km/s)^2
+        self.virial_radius = virial_radius # h^-1 Mpc
         self.total_luminosity = lum4
-        # self.edge_flag = 0
+
+    def r200(self, cosmo, delta): # h^-1 Mpc
+        rho = cosmo.critical_density(self.z)
+        radius = (((3/4)*(self.cluster_mass)/(delta*np.pi*rho))**(1/3)).to(u.Mpc, u.with_H0(cosmo.H0))
+        return (radius*((cosmo.H0/100).value)/u.littleh).to(u.Mpc/u.littleh) # littleh scaling

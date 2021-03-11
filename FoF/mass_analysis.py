@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 from scipy.stats import linregress
 
 from params import *
 from cluster import CleanedCluster
-from analysis.mass_estimator import virial_mass_estimator, projected_mass_estimator
+from mass_estimator import virial_mass_estimator, projected_mass_estimator
 
 
 def find_masses(data, estimator): # adapt this into find_quantities, include total_luminosity (or sum of top 4 luminosities)
@@ -13,7 +15,7 @@ def find_masses(data, estimator): # adapt this into find_quantities, include tot
             mass, vel_disp, virial_radius = virial_mass_estimator(c)
 
             luminosity = c.galaxies[:,9]
-            lum4 = np.sort(luminosity, axis=0)[:4] # 4 brightess galaxies in cluster
+            lum4 = -np.sort(-luminosity, axis=0)[:4] # 4 brightess galaxies in cluster
             lum4 = np.log10(sum(10**lum4))
             new_c = CleanedCluster(c.center_attributes, c.galaxies, mass, vel_disp, virial_radius, lum4)
 

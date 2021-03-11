@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
@@ -57,7 +59,7 @@ def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
     z_arr = member_galaxies[:,2]
 
     average_redshift = np.mean(z_arr)
-    cluster_vel = (redshift_to_velocity(z_arr) - redshift_to_velocity(average_redshift))/(1+average_redshift)
+    cluster_vel = redshift_to_velocity(z_arr, average_redshift)
     cluster_vel_disp = velocity_dispersion(cluster_vel, cluster_size)
 
     # galaxy separations
@@ -86,7 +88,7 @@ def projected_mass_estimator(cluster):
     member_galaxies = cluster.galaxies
     N = len(member_galaxies)
     average_redshift = np.mean(member_galaxies[:,2])
-    cluster_velocity = (redshift_to_velocity(member_galaxies[:,2]) - redshift_to_velocity(average_redshift))/(1+average_redshift) # in km/s
+    cluster_velocity = redshift_to_velocity(member_galaxies[:,2], average_redshift) # in km/s
 
     c = SkyCoord(ra=member_galaxies[:,0]*u.degree, dec=member_galaxies[:,1]*u.degree)
     centroid = SkyCoord(ra=np.mean(member_galaxies[:,0])*u.degree, dec=np.mean(member_galaxies[:,1])*u.degree)

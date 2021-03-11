@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sqlite3
 import pandas as pd
 from random import uniform
@@ -74,7 +76,7 @@ def center_overdensity(center, galaxy_data, max_velocity): # calculate overdensi
     assert points.shape == (n,2)
 
     # select all galaxies within max velocity
-    velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2])-redshift_to_velocity(center.z))/(1+center.z) <= max_velocity]
+    velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2], center.z)) <= max_velocity]
     # velocity_bin = galaxy_data[abs(galaxy_data[:,2]-center.z) <= 0.02*(1+center.z)]
 
     virial_gsp = GriSPy(velocity_bin[:,:2], metric='haversine')
@@ -126,7 +128,7 @@ def luminous_search(galaxy_data, max_velocity, path='FoF\\analysis\\derived_data
     # count N(0.5) for each galaxy
     for i, galaxy in enumerate(main_arr): 
 
-        vel_bin = main_arr[abs(redshift_to_velocity(main_arr[:,2])-redshift_to_velocity(galaxy[2]))/(1+galaxy[2]) <= max_velocity] # select galaxies within appropriate redshift range
+        vel_bin = main_arr[abs(redshift_to_velocity(galaxy_data[:,2], galaxy[2])) <= max_velocity] # select galaxies within appropriate redshift range
         # vel_bin = main_arr[abs(main_arr[:,2]-galaxy[2]) <= 0.02*(1+galaxy[2])]
 
         if (len(vel_bin) >= 8):
@@ -190,17 +192,23 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     for i, center in enumerate(luminous_data): # each row is a candidate center to search around
 
         if tracker[i]:
-            velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2])-redshift_to_velocity(center[2]))/(1+center[2]) <= max_velocity] # select galaxies within max velocity
+            velocity_bin = galaxy_data[abs(redshift_to_velocity(galaxy_data[:,2], center[2])) <= max_velocity] # select galaxies within max velocity
             # velocity_bin = galaxy_data[abs(galaxy_data[:,2]-center[2]) <= 0.02*(1+center[2])]
 
             virial_gsp = GriSPy(velocity_bin[:,:2], metric='haversine')
-            max_dist = linear_to_angular_dist(virial_radius, center[2]).value # convert virial radius to angular distance
+
+            # given virial radius is in proper distances, we convert to comoving distance to account for cosmological expansion.
+            ang_virial_radius = linear_to_angular_dist(virial_radius, center[2]).to('rad') # convert proper virial radius to angular distance
+            max_dist = (ang_virial_radius*cosmo.comoving_transverse_distance(center[2])).to(u.Mpc, u.dimensionless_angles()) # convert to comoving distance
+            max_dist = linear_to_angular_dist(max_dist, center[2]).value # convert comoving distance to angular distance
+
             virial_dist, virial_idx = virial_gsp.bubble_neighbors(np.array([center[:2]]), distance_upper_bound=max_dist) # for some reason, the center must be a ndarray of (n,2)
             virial_points = velocity_bin[tuple(virial_idx)] # convert to tuple for deprecation warning
 
             if len(virial_points) >= 12: # reject if less than 12 surrounding galaxies within virial radius (to save time) 
-                mean_sep = mean_separation(len(virial_points), 2*virial_radius) # in h^-1 Mpc
-                linking_length = ((linking_length_factor*mean_sep).to(u.Mpc, u.with_H0(cosmo.H0))) # determine transverse LL from local mean separation
+                mean_sep = mean_separation(len(virial_points), center[2], max_dist*u.degree, max_velocity) # Mpc
+                linking_length = linking_length_factor*mean_sep # determine transverse LL from local mean separation
+                # sep_arr.append([linking_length.value, center[2]])
                 linking_length = linear_to_angular_dist(linking_length, center[2]).value # fix linking length here
 
                 f_gsp = GriSPy(virial_points[:,:2], metric='haversine')
@@ -213,7 +221,7 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
                 for idx in fof_idx:
                     fof_points = virial_points[idx]
 
-                    # ensure no repeated points in 1 cluster
+                    # ensure no repeated points in cluster
                     mask = np.isin(fof_points, member_galaxies, invert=True) # filter for points not already accounted for
                     vec_mask = np.isin(mask.sum(axis=1), center.shape[0])
                     fof_points = fof_points[vec_mask].reshape((-1,center.shape[0])) # points of 2 linking lengths (FoF)
@@ -237,10 +245,12 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
                     for i in coi_idx:
                         tracker[i] = 0
 
-            # if len(candidates) >= 50: # for quick testing
+            # if len(candidates) >= 300: # for quick testing
             #     break
 
     # check_plots(candidates)
+
+    # tracks mean separation across redshift
     # sep_arr = np.array(sep_arr)
     # plt.plot(sep_arr[:,1], sep_arr[:,0], '.')
     # plt.show()
@@ -255,7 +265,7 @@ def FoF(galaxy_data, luminous_data, max_velocity, linking_length_factor, virial_
     for center in candidates:
 
         # identity overlapping centers (centers lying within virial radius of current cluster)
-        velocity_bin = candidate_centers[abs(redshift_to_velocity(candidate_centers[:,2])-redshift_to_velocity(center.z))/(1+center.z) <= max_velocity] # select galaxies within max velocity
+        velocity_bin = candidate_centers[abs(redshift_to_velocity(candidate_centers[:,2], center.z)) <= max_velocity] # select galaxies within max velocity
         # velocity_bin = candidate_centers[abs(candidate_centers[:,2]-center.z) <= 0.02*(1+center.z)]
 
         center_gsp = GriSPy(velocity_bin[:,:2], metric='haversine')
@@ -367,7 +377,7 @@ def three_sigma(center, member_galaxies, n):
     assert member_galaxies.shape[1] == N[1]+2, 'Cluster member array is wrong shape.'
 
     # initialize velocity column with redshift-velocity formula
-    member_galaxies[:,-2] = (redshift_to_velocity(member_galaxies[:,2]) - redshift_to_velocity(center.z))/(1+center.z)
+    member_galaxies[:,-2] = redshift_to_velocity(member_galaxies[:,2], center.z)
 
     # initialize projected radial distance column
     center_coord = SkyCoord(center.ra*u.deg, center.dec*u.deg)
@@ -393,21 +403,27 @@ def three_sigma(center, member_galaxies, n):
         while (size_change != 0) and (len(bin_galaxies) > 0): # repeat until convergence for each bin
             size_before = len(bin_galaxies)
 
-            if len(bin_galaxies) > 1:
+            if len(bin_galaxies) > 2:
                 bin_vel_arr = bin_galaxies[:,-2]
                 sort_idx = np.argsort(np.abs(bin_vel_arr-np.mean(bin_vel_arr))) # sort by deviation from mean
                 bin_galaxies = bin_galaxies[sort_idx]
-                new_bin_galaxies = bin_galaxies[:-1,:] # do not consider galaxy with largest deviation
+
+                if bin_galaxies[-1,-1] == 0.0: # if galaxy with largest deviation is center
+                    ignored_galaxy = bin_galaxies[-2,:]
+                    new_bin_galaxies = np.delete(bin_galaxies, (-2), axis=0)
+                else:
+                    ignored_galaxy = bin_galaxies[-1,:]
+                    new_bin_galaxies = bin_galaxies[:-1,:] # do not consider galaxy with largest deviation
+
+                assert ignored_galaxy[-1] != 0.0, 'Galaxy with largest deviation is the cluster center'
                 new_vel_arr = new_bin_galaxies[:,-2]
-                ignored_galaxy = bin_galaxies[-1,:]
-                # assert ignored_galaxy[-1] == 0.0, 'Galaxy with largest deviation is the cluster center'
 
                 if (bin_galaxies[-1,-1] != 0.0): # if ignored galaxy is not center
                     if len(new_vel_arr) > 1:
                         bin_mean = np.mean(new_vel_arr) # velocity mean
                         bin_dispersion = sum((new_vel_arr-bin_mean)**2)/(len(new_vel_arr)-1) # velocity dispersion
 
-                        if (abs(ignored_galaxy[-2] - bin_mean) >= 3*np.sqrt(bin_dispersion)): # if outlier velocity lies outside 3 sigma
+                        if (abs(ignored_galaxy[-2] - bin_mean) > 3*np.sqrt(bin_dispersion)): # if outlier velocity lies outside 3 sigma
                             bin_galaxies = new_bin_galaxies # remove outlier
 
             size_after = len(bin_galaxies)
@@ -423,6 +439,8 @@ def three_sigma(center, member_galaxies, n):
 def interloper_removal(data):
 
     print(f'Removing interlopers from {len(data)} clusters')
+    number_removed = []
+
     for i, c in enumerate(data):
         initial_size = len(c.galaxies)
         cleaned_galaxies = three_sigma(c, c.galaxies, 10)
@@ -431,10 +449,11 @@ def interloper_removal(data):
         size_change = initial_size - len(cleaned_galaxies)
         if i % 100 == 0:
             print(f'Interlopers removed from cluster {i}: {size_change}')
+        number_removed.append(size_change)
 
     cleaned_candidates = [c for c in data if c.richness >= richness]
     print(f'Number of clusters: {len(cleaned_candidates)} returned')
-    return cleaned_candidates
+    return cleaned_candidates, number_removed
 
 
 
@@ -485,11 +504,13 @@ if __name__ == "__main__":
     # INTERLOPER REMOVAL #
     ######################
     # with open(fname+'candidates.dat', 'rb') as f:
-    #     candidates = pickle.load(f)
+        # candidates = pickle.load(f)
 
-    # cleaned_candidates = interloper_removal(candidates)
+    # cleaned_candidates, number_removed = interloper_removal(candidates)
 
-    # # check interloper removal
+    # check interloper removal
+    # plt.hist(number_removed, bins=10)
+    # plt.show()
 
     # with open(fname+'cleaned_candidates.dat', 'wb') as f:
     #     pickle.dump(cleaned_candidates, f)
@@ -514,14 +535,17 @@ if __name__ == "__main__":
         bins = np.arange(0.5,2.53,0.00666)
         digitized = np.digitize(z_arr, bins)
 
-        for i in range(1,len(bins)):
+        for i in range(150,len(bins)):
             binned_data = clusters[np.where(digitized==i)]
             binned_data = sorted(binned_data, key=lambda x: x.ra)
             logging.info(f'Number of clusters in bin {i}: {len(binned_data)}')
 
             if len(binned_data): # plot clusters for checking
-                fig = plt.figure(figsize=(10,8))
-                logging.info(f'Plotting bin {i}. Clusters with binned redshift {bins[i]}')
+                logging.info(f'Plotting bin {i}/{len(bins)}. Clusters with binned redshift: {bins[i]}')
+
+                fig, ax = plt.subplots(figsize=(10,8))
+                ax.minorticks_on()
+                ax.tick_params(top=True, right=True, labeltop=True, labelright=True, which='both', direction='inout')
 
                 for i, center in enumerate(binned_data):
                     plt.scatter(center.galaxies[:,0], center.galaxies[:,1], s=5)
