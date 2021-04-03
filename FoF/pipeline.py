@@ -107,9 +107,20 @@ Import data of galaxies with information of (in this order):
 ####################
 # CATALOG MATCHING #
 ####################
+from catalog_matching import compare_clusters
 
+conn = sqlite3.connect('FoF\\processing\\datasets\\galaxy_clusters.db')
 
+lensing_df = pd.read_sql_query('''
+    SELECT RAdeg, DEdeg, z, Rich
+    FROM lensing
+    WHERE Rich>=? AND z>=0.5 AND (RAdeg BETWEEN ? AND ?) AND (DEdeg BETWEEN ? AND ?)
+    ORDER BY z
+    ''', conn, params=(richness, lims[0], lims[1], lims[2], lims[3]))
+lensing_arr = lensing_df.values
+conn.close()
 
+lensing_matched, lensing_catalog_idx = compare_clusters(virial_clusters, lensing_arr, 0.5*u.Mpc/u.littleh, richness_plot=False)
 
 
 #################
