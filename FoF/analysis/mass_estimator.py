@@ -3,14 +3,12 @@
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import quad_vec
 
 from astropy import units as u
 import astropy.constants as const
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import LambdaCDM
 
-from astropy.modeling.models import NFW
 from astropy.stats import bootstrap
 from astropy.utils import NumpyRNGContext
 
@@ -33,7 +31,7 @@ def cluster_mass(cluster_vel_disp, projected_radius):
     return mass.to(u.M_sun/u.littleh)
 
 
-def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
+def virial_mass_estimator(cluster):
     ''' 
     Calculates virial masses of galaxy clusters with the virial mass formula
 
@@ -60,7 +58,13 @@ def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
 
     average_redshift = np.mean(z_arr)
     cluster_vel = redshift_to_velocity(z_arr, average_redshift)
+    cluster_vel_err = velocity_error(cluster, z_arr, average_redshift, cluster_vel)
     cluster_vel_disp = velocity_dispersion(cluster_vel, cluster_size)
+
+    bootfunc = lambda x: (velocity_dispersion(x, len(x)))
+    bootstrap_disp = np.std(bootstrapping(cluster_vel.value, bootfunc))
+    harmonic_disp = (1/cluster_size)*(sum(1/(cluster_vel_err**2)))**(-1)
+    combined_disp_err = (np.sqrt(harmonic_disp.value**2 + (bootstrap_disp)**2))*(u.km**2/u.s**2)
 
     # galaxy separations
     c = SkyCoord(ra=member_galaxies[:,0]*u.degree, dec=member_galaxies[:,1]*u.degree) # array of coordinates
@@ -70,7 +74,6 @@ def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
     d_A = cosmo.angular_diameter_distance(z=average_redshift) # angular diameter distance
 
     pairs = c[pairs_idx]
-    total_separation = 0
 
     projected_sep = pairs[:,0].separation(pairs[:,1]) # projected separation (in deg)
     actual_sep = (projected_sep*d_A).to(u.Mpc, u.dimensionless_angles()) # convert projected separation to Mpc
@@ -79,16 +82,18 @@ def virial_mass_estimator(cluster): # INCLUDE MASS WEIGHTING
     
     cluster_radius = projected_radius(cluster_size, total_separation)
     mass = cluster_mass(cluster_vel_disp, cluster_radius)
+    mass_err = mass_error(mass, cluster_vel_disp, combined_disp_err)
 
-    return mass, cluster_vel_disp, cluster_radius # M_sun/littleh, km^2/s^2, Mpc/littleh
+    return mass, mass_err, cluster_vel_disp, combined_disp_err, cluster_radius # M_sun/littleh, km^2/s^2, Mpc/littleh
 
 
 def projected_mass_estimator(cluster):
 
     member_galaxies = cluster.galaxies
     N = len(member_galaxies)
-    average_redshift = np.mean(member_galaxies[:,2])
-    cluster_velocity = redshift_to_velocity(member_galaxies[:,2], average_redshift) # in km/s
+    z_arr = member_galaxies[:,2]
+    average_redshift = np.mean(z_arr)
+    cluster_vel = redshift_to_velocity(z_arr, average_redshift) # in km/s
 
     c = SkyCoord(ra=member_galaxies[:,0]*u.degree, dec=member_galaxies[:,1]*u.degree)
     centroid = SkyCoord(ra=np.mean(member_galaxies[:,0])*u.degree, dec=np.mean(member_galaxies[:,1])*u.degree)
@@ -99,68 +104,43 @@ def projected_mass_estimator(cluster):
     actual_separation = (cluster_separation*d_A).to(u.Mpc, u.dimensionless_angles())
     actual_separation = (actual_separation*((cosmo.H0/100).value)/u.littleh).to(u.Mpc/u.littleh) # include littleh scaling
 
-    sumproduct = np.sum(actual_separation*cluster_velocity**2)
+    sumproduct = np.sum(actual_separation*cluster_vel**2)
     projected_mass = (32/np.pi)*(1/const.G)*(1/(N-1.5))*sumproduct
 
-    return projected_mass.to(u.M_sun/u.littleh)
+    vel_err = velocity_error(cluster, z_arr, average_redshift, cluster_vel)
+    mass_err = np.sqrt(sum((2*cluster_vel*vel_err)**2))
+
+    return projected_mass.to(u.M_sun/u.littleh), mass_err
 
 
-def mass_correction(mass, r_200, bcg_arr):
-    mass = mass*u.M_sun
-    c_200 = 5
-    r_200 = r_200*u.Mpc
-    redshift = bcg_arr[:,2]
+def velocity_error(cluster, z_arr, z_average, velocities):
+    galaxies = cluster.galaxies
+    galaxies_z_err = abs(galaxies[:,3:5]-z_arr[:,np.newaxis]) # upper and lower error
 
-    nfw = NFW(mass=mass, concentration=c_200, redshift=redshift, cosmo=cosmo)
-    n_200 = nfw(r_200)
+    # take the maximum error range
+    galaxies_z_err = np.amax(galaxies_z_err, axis=1) 
 
-    f = nfw.A_NFW(c_200)
-    delta_c = (200/3)*(c_200**3)/f
-    critical_density = cosmo.critical_density(z=bcg_arr[:,2])
-    # rho_200 = (delta_c*critical_density)/(c_200*(1+c_200)**2)
+    # calculate numerator and denominator errors
+    z_average_err = np.sqrt(sum(galaxies_z_err**2))/len(z_arr) # standard error of mean
+    z_diff_err = np.sqrt(np.add(z_average_err**2,galaxies_z_err**2))
 
-    # integral = (4*np.pi*critical_density*delta_c)*((1/(c_200+1)) + np.log(c_200+1) - 1)*(r_200/c_200)**3
-
-    def integrand(x):
-        x = (x*u.Mpc).to(u.kpc)
-        r_s = nfw.r_s
-        return (4*np.pi*delta_c*critical_density*r_s**3*(x/(x+r_s)**2)).to(u.M_sun/u.Mpc).value
-
-    integral, err = quad_vec(integrand, 0, r_200.value)
-    integral = integral*u.M_sun
-    density_term = n_200/integral
-    dispersion = 1/3
-    C = ((4*np.pi*r_200**3)*dispersion*density_term*mass).to(u.M_sun)
-    return mass - C
+    # combined error of velocities
+    err = abs(velocities)*np.sqrt((z_average_err/z_average)**2 + ((z_diff_err)/(z_arr-z_average))**2)
+    return err
 
 
-# bootstrap
-def uncertainty(cluster_members):
-    bootfunc = lambda x: virial_mass_estimator(x)
+def mass_error(mass, vel_disp, vel_disp_err):
+    return mass*(vel_disp_err/vel_disp)
+
+
+def log_error(error, quantity):
+    return 0.434*(error/quantity)
+
+
+def bootstrapping(bootarr, bootfunc):
+    # gives multiple velocity dispersion
     with NumpyRNGContext(1):
-        bootresult = bootstrap(cluster_members, bootnum=50) # returns 50 samples of 1 cluster
+        bootresult = bootstrap(bootarr, bootnum=100, samples=len(bootarr)-1, bootfunc=bootfunc)
     return bootresult
-
-
-
-if __name__ == "__main__":
-    pass
-
-    
-
-# -----------------
-    # corrected_mass = mass_correction(masses, 2, bcg_arr).value
-    # np.savetxt('corrected_masses.txt', corrected_mass)
-
-    # plot mass against corrected mass difference
-    # plt.figure(figsize=(12,8))
-    # plt.scatter(bcg_df['redshift'], np.log10(corrected_mass), s=8, color='k', alpha=0.5)
-    # plt.scatter(bcg_df['redshift'], np.log10(masses), s=8, color='red', alpha=0.5)
-    # plt.axis()
-    # plt.scatter(masses, (masses-corrected_mass)/masses, s=8, alpha=0.75)
-    # plt.show()
-
-
-
 
     

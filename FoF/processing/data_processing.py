@@ -6,17 +6,16 @@ from methods import fits_to_df, add_data
 
 
 # --- import fits files to df
-import pandas as pd
-test_df = pd.read_csv('FoF\\processing\\datasets\\cosmos2015_dataset.csv')
-print(test_df.columns)
+# import pandas as pd
+# test_df = pd.read_csv('FoF\\processing\\datasets\\cosmos2015_dataset.csv')
+# print(test_df.columns)
 # cosmic_web_df = fits_to_df('J_ApJ_837_16_table1.dat.gz.fits')
 # deep_field_df = fits_to_df('J_ApJ_734_68_table2.dat.fits')
 # ultra_deep_df = fits_to_df('J_MNRAS_423_2436_table1.dat.fits')
-
+# lensing_df = fits_to_df('J_MNRAS_413_1145_table1.dat.fits')
 
 # --- Custom data cleaning and filtering 
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
-
 
 # --- cosmic_web
 # cosmic_web_df = cosmic_web_df[(cosmic_web_df['Ngroup'] != -99)]
@@ -38,8 +37,15 @@ print(test_df.columns)
 # ultra_deep_df.columns = ['cluster_id', 'ra', 'dec', 'redshift', 'R', 'number_density', 'L4']
 
 
+# --- xrays groups
+# xray_df = pd.read_csv('FoF\\processing\\datasets\\xgroups.csv')
+# xray_df = xray_df[xray_df['FLAG_INCLUDE'] == 1]
+
+
 # --- Add datasets to database, form cleaned csv file
 # add_data(cosmic_web_df, 'cosmic_web_bcg')
 # add_data(cosmic_web_members_df, 'cosmic_web_members')
 # add_data(deep_field_df, 'deep_field')
 # add_data(ultra_deep_df, 'ultra_deep')
+# add_data(xray_df, 'xgroups')
+# add_data(lensing_df, 'lensing')

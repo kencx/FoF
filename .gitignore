@@ -13,3 +13,6 @@ FoF/analysis/export.py
 __pycache__
 .vscode
 testing.py
+plotting.py
+clustering.py
+FoF/SDSS/

@@ -21,7 +21,7 @@ def fits_to_df(fname):
         Pandas Dataframe
     '''
 
-    d = fits.open('processing\\datasets\\' + fname)
+    d = fits.open('FoF\\processing\\datasets\\' + fname)
     print(d.info())
     col_num = int(input('Choose the table to import: '))
     t = Table(d[col_num].data)
@@ -48,7 +48,7 @@ def drop_null(df):
 
 # ----- EXPORT DATA --------
 def df_to_csv(df, fname):
-    df.to_csv('processing\\datasets\\' + fname + '_cleaned.csv')
+    df.to_csv('FoF\\processing\\datasets\\' + fname + '_cleaned.csv')
     print(fname + ' CSV file added.')
 
 
@@ -63,7 +63,7 @@ def add_to_db(df, table_name):
         Table to be added to
     
     '''
-    conn = sqlite3.connect('processing\\datasets\\galaxy_clusters.db')
+    conn = sqlite3.connect('FoF\\processing\\datasets\\galaxy_clusters.db')
     c = conn.cursor()
     df.to_sql(table_name, conn, if_exists='replace', index=False)
     print('Table added to SQL DB.')
@@ -107,11 +107,22 @@ def split_df_into_groups(df, column, n):
 
 
 # --- DB MANAGEMENT ---
-def print_tables():
-    conn = sqlite3.connect('processing\\datasets\\galaxy_clusters.db')
+path = 'FoF\\processing\\datasets\\galaxy_clusters.db'
+def print_tables(path):
+    conn = sqlite3.connect(path)
     c = conn.cursor()
     c.execute('''SELECT name FROM sqlite_master WHERE type="table"''')
     print(c.fetchall())
     conn.close()
 
-# print_tables()
+def drop_table(path):
+    conn = sqlite3.connect(path)
+    c = conn.cursor()
+    data3 = str(input('Please enter name: '))
+    mydata = c.execute("DELETE FROM sqlite_master WHERE Name=?", (data3,))
+    conn.commit()
+    c.close
+
+# print_tables(path)
+# drop_table(path)
+# print(1)

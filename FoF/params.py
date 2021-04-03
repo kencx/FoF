@@ -21,13 +21,19 @@ max_redshift = 2.5
 
 # FoF key parameters
 max_velocity = 2000*u.km/u.s
-linking_length_factor = 0.8
-virial_radius = 1.5*u.Mpc/u.littleh
-
-# cluster size parameters
+linking_length_factor = 0.1 # b
+max_radius = 1.5*u.Mpc/u.littleh
 richness = 12
-D = 2
+D = 2 # overdensity
 
-# path
-fname = f'FoF\\analysis\\derived_datasets\\R{richness}_D{D}_vel\\'
-# plot = False
+
+# path to save datasets
+import os
+
+dpath = 'FoF\\analysis\\derived_datasets\\'
+dname = f'R{richness}_D{D}\\'
+fname = dpath + dname
+
+os.makedirs(os.path.dirname(fname), exist_ok=True) # create dir if not already present
+
+

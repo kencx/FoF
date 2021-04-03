@@ -7,23 +7,27 @@ import astropy.units as u
 class Cluster:
     
     # initialize with __slots__
-    __slots__ = ['ra', 'dec', 'z', 'z_unc', 'bcg_absMag', 'gal_id', 'N', 'galaxies', 'D','flag_poor', 'properties', '_richness', '_center_attributes']
-    
+    # __slots__ = ['ra', 'dec', 'z', 'z_unc', 'bcg_absMag', 'bcg_logSM', 'bcg_logSFR', 'gal_id', 'bcg_logLR', 'N', 'galaxies', 'D','flag_poor', '_richness', '_center_attributes']
+    __slots__ = ['ra', 'dec', 'z', 'z_unc', 'bcg_appMag', 'gal_id', 'bcg_absMag', 'N', 'galaxies', 'D','flag_poor', '_richness', '_center_attributes']
+
     def __init__(self, center, galaxies):
 
         # center properties
         self.ra = center[0]
         self.dec = center[1]
         self.z = center[2]
-        self.z_unc = [center[3], center[4]] # z_lower, z_upper
-        self.bcg_absMag = center[5] # absolute magnitude
-        self.gal_id = center[6] # ID 
-        self.N = center[-1] # N(0.5), number count
-        self.galaxies = galaxies # ndarray
-        self.D = 0 # overdensity
-        self.flag_poor = False # for manual flagging
-        if len(center) > 8:
-            self.properties = center[7:-1] # other optional properties
+        # self.z_unc = [center[3], center[4]] # z_lower, z_upper
+        self.z_unc = center[3]
+        self.bcg_appMag = center[4]
+        self.gal_id = center[5]
+        self.bcg_absMag = center[6]
+        # self.bcg_logSM = center[6]
+        # self.bcg_logSFR = center[7]
+        # self.bcg_logLR = center[9]
+        self.N = center[-1]
+        self.galaxies = galaxies # np array
+        self.D = 0
+        self.flag_poor = False
 
 
     @property
@@ -33,7 +37,8 @@ class Cluster:
 
     @property
     def center_attributes(self): # easy conversion of attributes to array
-        center = np.array([self.ra, self.dec, self.z, self.z_unc[0], self.z_unc[1], self.bcg_absMag, self.gal_id, self.N])
+        # center = np.array([self.ra, self.dec, self.z, self.z_unc[0], self.z_unc[1], self.bcg_absMag, self.bcg_logSM, self.bcg_logSFR, self.gal_id, self.bcg_logLR, self.N])
+        center = np.array([self.ra, self.dec, self.z, self.z_unc, self.bcg_appMag, self.gal_id, self.bcg_absMag, self.N])
         return center
 
 
@@ -62,22 +67,21 @@ class Cluster:
 
 
     def __str__(self):
-        return f'Cluster at ({self.ra:.2f},{self.dec:.2f},{self.z:.2f}) with {self.richness} galaxies'
+        return 'Cluster at ({self.ra},{self.dec},{self.z}) with {self.richness} galaxies'.format(self=self)
 
 
 
 class CleanedCluster(Cluster):
     # __slots__ = ['cluster_mass', 'vel_disp', 'projected_radius']
 
-    def __init__(self, center, galaxies, cluster_mass, mass_err, vel_disp, vel_disp_err, projected_radius, absmag):
+    def __init__(self, center, galaxies, cluster_mass, mass_error, vel_disp, projected_radius, lum4):
         super().__init__(center, galaxies)
 
         self.cluster_mass = cluster_mass  # h^-1 M_sun
-        self.mass_err = mass_err
+        self.mass_err = mass_error
         self.vel_disp = vel_disp # (km/s)^2
-        self.vel_disp_err = vel_disp_err
         self.projected_radius = projected_radius # h^-1 Mpc
-        self.total_absmag = absmag
+        self.total_luminosity = lum4
 
     # def r200(self, cosmo, delta): # h^-1 Mpc
     #     rho = cosmo.critical_density(self.z)

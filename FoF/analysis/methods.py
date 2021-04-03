@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from scipy.integrate import quad
 from astropy import constants as const
 from astropy import units as u
 from astropy.cosmology import LambdaCDM
@@ -28,7 +29,7 @@ def linear_to_angular_dist(distance, photo_z):
     return (distance.to(u.Mpc, u.with_H0(cosmo.H0))*cosmo.arcsec_per_kpc_proper(photo_z)).to(u.deg)
 
 
-def mean_separation(n, z, max_dist, max_velocity):
+def mean_separation(n, z, max_dist, max_velocity, survey_area):
     '''
     Average mean separation at redshift z of n galaxies within a maximum radius of max_dist and velocity range of +- max_velocity (equivalent to redshift bin, dz).
 
@@ -52,16 +53,13 @@ def mean_separation(n, z, max_dist, max_velocity):
         Average mean separation in Mpc
 
     '''
-    # volume = 4/3 * np.pi * (radius.to(u.Mpc, u.with_H0(cosmo.H0)))**3
-    # density = n/volume
-    # return (1/(density**(1/3))).to(u.Mpc)
-
     dz = (max_velocity.to('km/s'))/(const.c.to('km/s'))
-    dn_dz = n/dz
-    dv_dz = cosmo.differential_comoving_volume(z)*(max_dist.to(u.deg))**2
 
-    number_density = dn_dz/dv_dz
-    return (number_density**(-1/3)).to(u.Mpc)
+    temp = lambda x: cosmo.differential_comoving_volume(x).value
+    solid_angle = (np.pi*(survey_area*u.deg)**2).to(u.sr)
+    V = ((quad(temp, z, z+dz)[0])*u.Mpc**3/u.sr)*solid_angle
+    ndensity = (n/V).to(u.Mpc**-3)
+    return ndensity**(-1/3)
     
 
 def redshift_to_velocity(z, center_z):
