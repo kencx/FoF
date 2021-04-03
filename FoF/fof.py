@@ -68,8 +68,8 @@ def candidate_center_search(galaxy_data, max_velocity, fname, path='FoF\\analysi
 
     print(f'Total Number of Galaxies in sample: {len(main_arr)}, Number of candidate centers: {len(candidate_centers)}')
 
-    np.savetxt(path + fname + 'galaxy_data.csv', main_arr, delimiter=',')
-    np.savetxt(path + fname + 'candidate_centers_velocity.csv', candidate_centers, delimiter=',')
+    np.savetxt(path + fname + '_galaxy_data.csv', main_arr, delimiter=',')
+    np.savetxt(path + fname + '_candidate_centers.csv', candidate_centers, delimiter=',')
 
     return main_arr, candidate_centers
 
@@ -176,8 +176,8 @@ def FoF(galaxy_data, candidate_centers, richness, overdensity, max_velocity=2000
                     for i in coi_idx:
                         tracker[i] = 0
 
-            if len(candidates) >= 100: # for quick testing
-                break
+            # if len(candidates) >= 100: # for quick testing
+                # break
     
     # plot_clusters(candidates, flagging=False) # for quick check of clusters
 

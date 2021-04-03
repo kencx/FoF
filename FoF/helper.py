@@ -5,6 +5,11 @@ import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
 
+from astropy import units as u
+from grispy import GriSPy
+from cluster import Cluster
+from analysis.methods import linear_to_angular_dist, mean_separation, redshift_to_velocity
+
 import logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -103,14 +108,14 @@ def lowess(x, y, f=2. / 3., iter=3):
     return yest
 
 # --- helper functions
-def setdiff2d(arr_1, arr_2): 
+def setdiff2d(cluster1, cluster2):
     '''
-    finds common rows between two 2d arrays and return the rows of arr1 not present in arr2
+    Find common rows between two 2d arrays and return the rows of cluster1 not present in cluster2
     '''
-    dtype = [('ra', np.float64), ('dec', np.float64), ('redshift', np.float64), ('z_lower', np.float64), ('z_upper', np.float64), ('absMag', np.float64), ('ID', np.float64), ('N(0.5)', np.float64)]
-    arr_1_struc = arr_1.ravel().view(dtype=dtype)
-    arr_2_struc = arr_2.ravel().view(dtype=dtype)
-    S = np.setdiff1d(arr_1_struc, arr_2_struc)
+    gal1 = cluster1[:,6] # use gal_id to extract unique galaxies
+    gal2 = cluster2[:,6]
+    mask = np.isin(gal1, gal2, invert=True)
+    S = cluster1[mask,:]
     return S
 
 
