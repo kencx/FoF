@@ -8,7 +8,7 @@ from astropy.table import Table
 
 # ----- IMPORT DATA ------
 def fits_to_df(fname):
-    ''' Imports table from fits files and converts them to Pandas dataframes.
+    """Imports table from fits files and converts them to Pandas dataframes.
 
     Parameters
     ----------
@@ -19,15 +19,15 @@ def fits_to_df(fname):
     -------
     df: pd.Dataframe
         Pandas Dataframe
-    '''
+    """
 
-    d = fits.open('FoF\\processing\\datasets\\' + fname)
+    d = fits.open("FoF\\processing\\datasets\\" + fname)
     print(d.info())
-    col_num = int(input('Choose the table to import: '))
+    col_num = int(input("Choose the table to import: "))
     t = Table(d[col_num].data)
     df = t.to_pandas()
     d.close()
-    print('Dataframe of table ' + str(col_num) + ' initialized.')
+    print("Dataframe of table " + str(col_num) + " initialized.")
     print(df.head())
     return df
 
@@ -37,36 +37,37 @@ def drop_columns(df, col_list):
     df = df.drop(col_list, axis=1)
     return df
 
+
 def check_null(df):
     return df.isnull().sum()
+
 
 def drop_null(df):
     if sum(check_null(df)):
         return df.dropna()
 
 
-
 # ----- EXPORT DATA --------
 def df_to_csv(df, fname):
-    df.to_csv('FoF\\processing\\datasets\\' + fname + '_cleaned.csv')
-    print(fname + ' CSV file added.')
+    df.to_csv("FoF\\processing\\datasets\\" + fname + "_cleaned.csv")
+    print(fname + " CSV file added.")
 
 
 def add_to_db(df, table_name):
-    ''' Adds df to sqlite3 database. Table is created if it does not exists. If table exists, data is replaced.
+    """Adds df to sqlite3 database. Table is created if it does not exists. If table exists, data is replaced.
 
     Parameters
     ----------
     df: pd.Dataframe
-    
+
     table_name: str
         Table to be added to
-    
-    '''
-    conn = sqlite3.connect('FoF\\processing\\datasets\\galaxy_clusters.db')
+
+    """
+    conn = sqlite3.connect("FoF\\processing\\datasets\\galaxy_clusters.db")
     c = conn.cursor()
-    df.to_sql(table_name, conn, if_exists='replace', index=False)
-    print('Table added to SQL DB.')
+    df.to_sql(table_name, conn, if_exists="replace", index=False)
+    print("Table added to SQL DB.")
     conn.commit()
     conn.close()
 
@@ -77,7 +78,7 @@ def add_data(df, name):
 
 
 def split_df_into_groups(df, column, n):
-    ''' Splits df of group members into groups
+    """Splits df of group members into groups
 
     Parameters
     ----------
@@ -86,7 +87,7 @@ def split_df_into_groups(df, column, n):
 
     column: str
         Name of column to sort and group by
-    
+
     n: int
         Index of column to group by
 
@@ -94,20 +95,21 @@ def split_df_into_groups(df, column, n):
     -------
     arr: array-like
         Array of df rows
-    
+
     group_n: array-like
         Array of group ids
 
-    '''
+    """
     arr = df.sort_values(column).values
-    group_n = np.unique(arr[:,n])
-    
+    group_n = np.unique(arr[:, n])
+
     return arr, group_n
 
 
-
 # --- DB MANAGEMENT ---
-path = 'FoF\\processing\\datasets\\galaxy_clusters.db'
+path = "FoF\\processing\\datasets\\galaxy_clusters.db"
+
+
 def print_tables(path):
     conn = sqlite3.connect(path)
     c = conn.cursor()
@@ -115,14 +117,11 @@ def print_tables(path):
     print(c.fetchall())
     conn.close()
 
+
 def drop_table(path):
     conn = sqlite3.connect(path)
     c = conn.cursor()
-    data3 = str(input('Please enter name: '))
+    data3 = str(input("Please enter name: "))
     mydata = c.execute("DELETE FROM sqlite_master WHERE Name=?", (data3,))
     conn.commit()
     c.close
-
-# print_tables(path)
-# drop_table(path)
-# print(1)

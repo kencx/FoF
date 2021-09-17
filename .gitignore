@@ -6,13 +6,16 @@ FoF/processing/datasets/
 todo.txt
 
 FoF/analysis/__pycache__/
-FoF/analysis/derived_datasets/
+FoF/analysis/result_datasets/
 FoF/analysis/figures/
 FoF/analysis/export.py
 FoF/SDSS/
 
 __pycache__
 .vscode
+test.csv
 testing.py
 plotting.py
 clustering.py
+sdss_pipeline.py
+new_cluster.py

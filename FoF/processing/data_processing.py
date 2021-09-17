@@ -3,6 +3,7 @@
 from methods import fits_to_df, add_data
 
 # DATA PIPELINE FOR FITS -> DF -> SQLITE3 DATABASE
+# Comment out relevant section in template or add your own
 
 
 # --- import fits files to df
@@ -14,7 +15,7 @@ from methods import fits_to_df, add_data
 # ultra_deep_df = fits_to_df('J_MNRAS_423_2436_table1.dat.fits')
 # lensing_df = fits_to_df('J_MNRAS_413_1145_table1.dat.fits')
 
-# --- Custom data cleaning and filtering 
+# --- Custom data cleaning and filtering
 # KEY INFO : ['ra', 'dec', 'redshift', 'number of members/richness', 'group/galaxy id']
 
 # --- cosmic_web

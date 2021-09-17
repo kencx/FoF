@@ -6,10 +6,11 @@ from astropy import constants as const
 from astropy import units as u
 from astropy.cosmology import LambdaCDM
 
-cosmo = LambdaCDM(H0=70*u.km/u.Mpc/u.s, Om0=0.3, Ode0=0.7) # define cosmology
+cosmo = LambdaCDM(H0=70 * u.km / u.Mpc / u.s, Om0=0.3, Ode0=0.7)  # define cosmology
+
 
 def linear_to_angular_dist(distance, photo_z):
-    '''
+    """
     Converts proper distance (Mpc) to angular distance (deg). Used to find angular separations within clusters.
 
     Parameters
@@ -24,13 +25,15 @@ def linear_to_angular_dist(distance, photo_z):
     -------
     d: float, array-like
         Angular distance in deg
-    '''
+    """
 
-    return (distance.to(u.Mpc, u.with_H0(cosmo.H0))*cosmo.arcsec_per_kpc_proper(photo_z)).to(u.deg)
+    return (
+        distance.to(u.Mpc, u.with_H0(cosmo.H0)) * cosmo.arcsec_per_kpc_proper(photo_z)
+    ).to(u.deg)
 
 
 def mean_separation(n, z, max_dist, max_velocity, survey_area):
-    '''
+    """
     Average mean separation at redshift z of n galaxies within a maximum radius of max_dist and velocity range of +- max_velocity (equivalent to redshift bin, dz).
 
     Parameters
@@ -52,18 +55,18 @@ def mean_separation(n, z, max_dist, max_velocity, survey_area):
     mean_separation: float, array-like
         Average mean separation in Mpc
 
-    '''
-    dz = (max_velocity.to('km/s'))/(const.c.to('km/s'))
+    """
+    dz = (max_velocity.to("km/s")) / (const.c.to("km/s"))
 
     temp = lambda x: cosmo.differential_comoving_volume(x).value
-    solid_angle = (np.pi*(survey_area*u.deg)**2).to(u.sr)
-    V = ((quad(temp, z, z+dz)[0])*u.Mpc**3/u.sr)*solid_angle
-    ndensity = (n/V).to(u.Mpc**-3)
-    return ndensity**(-1/3)
-    
+    solid_angle = (np.pi * (survey_area * u.deg) ** 2).to(u.sr)
+    V = ((quad(temp, z, z + dz)[0]) * u.Mpc ** 3 / u.sr) * solid_angle
+    ndensity = (n / V).to(u.Mpc ** -3)
+    return ndensity ** (-1 / 3)
+
 
 def redshift_to_velocity(z, center_z):
-    '''
+    """
     Converts redshift to LOS velocity
 
     Parameters
@@ -72,13 +75,13 @@ def redshift_to_velocity(z, center_z):
         Redshift
     center_z: float
         Redshift of cluster center or cluster average
-    
+
     Returns
     -------
     v: array-like, float
         Velocity in km/s
-    '''
+    """
 
-    c = const.c.to('km/s')
-    v = (c*z - c*center_z)/(1+center_z)
+    c = const.c.to("km/s")
+    v = (c * z - c * center_z) / (1 + center_z)
     return v
